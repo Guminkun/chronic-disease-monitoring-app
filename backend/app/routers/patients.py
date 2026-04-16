@@ -752,25 +752,6 @@ async def upload_medical_record(
     if not file:
         raise HTTPException(status_code=400, detail="请选择要上传的图片")
     
-    content = await file.read()
-    
-    try:
-        bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
-        minio_url, object_name = minio_svc.upload_file(
-            content, 
-            file.filename, 
-            file.content_type, 
-            bucket_name=bucket
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="上传失败，请重试")
-    
-    try:
-        summary = await ocr_service._run_ocr_job(content, file.filename or "medical_record.jpg")
-        medical_fields = ocr_service.extract_medical_fields(summary)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="OCR识别失败，请重试")
-    
     target_member_id = member_id
     if not target_member_id:
         current_member = db.query(models.Member).filter(
@@ -778,6 +759,28 @@ async def upload_medical_record(
             models.Member.is_current == True
         ).first()
         target_member_id = current_member.id if current_member else None
+    
+    content = await file.read()
+    
+    try:
+        bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
+        file_key, md5_hash, thumbnail_key = minio_svc.upload_file(
+            content, 
+            str(current_user.id),
+            str(target_member_id) if target_member_id else "default",
+            "medical_records",
+            file.content_type or "image/jpeg",
+            bucket_name=bucket
+        )
+        minio_url = minio_svc.get_presigned_url(file_key, bucket_name=bucket)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+    
+    try:
+        summary = await ocr_service._run_ocr_job(content, file.filename or "medical_record.jpg")
+        medical_fields = ocr_service.extract_medical_fields(summary)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="OCR识别失败，请重试")
     
     report_date = datetime.date.today()
     if medical_fields.get('report_date'):

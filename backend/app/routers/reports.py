@@ -140,7 +140,15 @@ async def parse_report(
             if patient_disease_id
             else (settings.MINIO_BUCKET_REPORT or "jianchabaogao")
         )
-        minio_url, object_name = minio_service.upload_file(content, file.filename, file.content_type, bucket_name=bucket)
+        file_key, md5_hash, _ = minio_service.upload_file(
+            content, 
+            str(current_user.id),
+            str(patient_id) if patient_id else "default",
+            "reports",
+            file.content_type or "image/jpeg",
+            bucket_name=bucket
+        )
+        minio_url = minio_service.get_presigned_url(file_key, bucket_name=bucket)
         print(f"MinIO upload successful: {minio_url}")
     except Exception as e:
         print(f"MinIO upload failed: {e}")
@@ -197,7 +205,15 @@ async def parse_imaging_report(
             if patient_disease_id
             else (settings.MINIO_BUCKET_REPORT or "jianchabaogao")
         )
-        minio_url, _ = minio_service.upload_file(content, file.filename, file.content_type, bucket_name=bucket)
+        file_key, md5_hash, _ = minio_service.upload_file(
+            content, 
+            str(current_user.id),
+            str(patient_id) if patient_id else "default",
+            "imaging",
+            file.content_type or "image/jpeg",
+            bucket_name=bucket
+        )
+        minio_url = minio_service.get_presigned_url(file_key, bucket_name=bucket)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to storage: {str(e)}")
 
@@ -406,18 +422,37 @@ async def auto_classify_report(
     if not file:
         raise HTTPException(status_code=400, detail="请选择要上传的图片")
     
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(status_code=403, detail="Only patients can upload reports")
+    
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    patient_id = patient.id
+    
+    target_member_id = member_id
+    if not target_member_id:
+        current_member = db.query(models.Member).filter(
+            models.Member.patient_id == patient.id,
+            models.Member.is_current == True
+        ).first()
+        target_member_id = current_member.id if current_member else None
+    
     content = await file.read()
     
     try:
         bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
-        minio_url, object_name = minio_service.upload_file(
+        file_key, md5_hash, thumbnail_key = minio_service.upload_file(
             content, 
-            file.filename, 
-            file.content_type, 
+            str(current_user.id),
+            str(target_member_id) if target_member_id else "default",
+            "reports",
+            file.content_type or "image/jpeg",
             bucket_name=bucket
         )
+        minio_url = minio_service.get_presigned_url(file_key, bucket_name=bucket)
     except Exception as e:
-        raise HTTPException(status_code=500, detail="上传失败，请重试")
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
     
     ocr_text = ""
     parsed_metrics = []
@@ -450,84 +485,61 @@ async def auto_classify_report(
     
     report_category = classify_report_by_text(ocr_text, len(parsed_metrics))
     
-    try:
-        if current_user.role == models.UserRole.patient:
-            patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
-            if not patient:
-                raise HTTPException(status_code=404, detail="Patient profile not found")
-            patient_id = patient.id
-            
-            if not member_id:
-                current_member = db.query(models.Member).filter(
-                    models.Member.patient_id == patient.id,
-                    models.Member.is_current == True
-                ).first()
-                member_id = current_member.id if current_member else None
-        else:
-            raise HTTPException(status_code=403, detail="Only patients can upload reports")
-        
-        category_names = {
-            'lab': '化验单',
-            'imaging': '影像报告',
-            'unknown': '未分类'
-        }
-        report_type_name = category_names.get(report_category, '未分类')
-        
-        report_data = {"ocr_text": ocr_text, "category": report_category}
-        report_data.update(basic_info)
-        
-        if findings:
-            report_data["findings"] = findings
-        if diagnosis:
-            report_data["diagnosis"] = diagnosis
-        
-        report = models.Report(
-            patient_id=patient_id,
-            member_id=member_id,
-            report_date=report_date,
-            hospital_name=hospital_name,
-            report_type=report_type_name,
-            image_url=minio_url,
-            file_name=file.filename,
-            status=models.ReportStatus.normal,
-            data=report_data,
-            summary=ocr_text[:2000] if ocr_text else ""
-        )
-        db.add(report)
-        db.flush()
-        
-        if parsed_metrics and len(parsed_metrics) > 0:
-            for metric_data in parsed_metrics:
-                metric = models.ReportMetric(
-                    report_id=report.id,
-                    name=str(metric_data.get("name", ""))[:100],
-                    code=str(metric_data.get("code", ""))[:50] if metric_data.get("code") else None,
-                    value=str(metric_data.get("value", ""))[:50],
-                    unit=str(metric_data.get("unit", ""))[:50] if metric_data.get("unit") else None,
-                    reference_range=str(metric_data.get("range", ""))[:100] if metric_data.get("range") else None,
-                    is_abnormal=bool(metric_data.get("abnormal", False)),
-                    abnormal_symbol=str(metric_data.get("abnormal_symbol", ""))[:10] if metric_data.get("abnormal_symbol") else None
-                )
-                db.add(metric)
-        
-        db.commit()
-        db.refresh(report)
-        
-        message = "上传成功"
-        if report_category == 'unknown':
-            message = "无法自动识别类型，已标记为未分类"
-        
-        return {
-            "success": True,
-            "report_id": str(report.id),
-            "category": report_category,
-            "metrics_count": len(parsed_metrics),
-            "message": message
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        print(f"Error saving report: {e}")
-        raise HTTPException(status_code=500, detail="上传失败，请重试")
+    category_names = {
+        'lab': '化验单',
+        'imaging': '影像报告',
+        'unknown': '未分类'
+    }
+    report_type_name = category_names.get(report_category, '未分类')
+    
+    report_data = {"ocr_text": ocr_text, "category": report_category}
+    report_data.update(basic_info)
+    
+    if findings:
+        report_data["findings"] = findings
+    if diagnosis:
+        report_data["diagnosis"] = diagnosis
+    
+    report = models.Report(
+        patient_id=patient_id,
+        member_id=target_member_id,
+        report_date=report_date,
+        hospital_name=hospital_name,
+        report_type=report_type_name,
+        image_url=minio_url,
+        file_name=file.filename,
+        status=models.ReportStatus.normal,
+        data=report_data,
+        summary=ocr_text[:2000] if ocr_text else ""
+    )
+    db.add(report)
+    db.flush()
+    
+    if parsed_metrics and len(parsed_metrics) > 0:
+        for metric_data in parsed_metrics:
+            metric = models.ReportMetric(
+                report_id=report.id,
+                name=str(metric_data.get("name", ""))[:100],
+                code=str(metric_data.get("code", ""))[:50] if metric_data.get("code") else None,
+                value=str(metric_data.get("value", ""))[:50],
+                unit=str(metric_data.get("unit", ""))[:50] if metric_data.get("unit") else None,
+                reference_range=str(metric_data.get("range", ""))[:100] if metric_data.get("range") else None,
+                is_abnormal=bool(metric_data.get("abnormal", False)),
+                abnormal_symbol=str(metric_data.get("abnormal_symbol", ""))[:10] if metric_data.get("abnormal_symbol") else None
+            )
+            db.add(metric)
+    
+    db.commit()
+    db.refresh(report)
+    
+    message = "上传成功"
+    if report_category == 'unknown':
+        message = "无法自动识别类型，已标记为未分类"
+    
+    return {
+        "success": True,
+        "report_id": str(report.id),
+        "category": report_category,
+        "metrics_count": len(parsed_metrics),
+        "message": message
+    }

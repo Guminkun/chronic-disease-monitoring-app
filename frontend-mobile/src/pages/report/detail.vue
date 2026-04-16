@@ -1,8 +1,5 @@
 <template>
   <view class="page-container">
-    <!-- 顶部导航栏 -->
-    <PageHeader title="报告详情" />
-
     <scroll-view scroll-y class="page-scroll" :scroll-top="scrollTop">
       <view class="image-section" v-if="report.image_url" @click="previewImage">
         <image 
@@ -189,7 +186,6 @@
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getReportDetail } from '@/api/report'
-import PageHeader from '@/components/PageHeader.vue'
 
 const report = ref<any>({})
 
@@ -362,7 +358,6 @@ onLoad((options) => {
 
 .page-scroll {
   flex: 1;
-  margin-top: 56px;
 }
 
 .image-section {

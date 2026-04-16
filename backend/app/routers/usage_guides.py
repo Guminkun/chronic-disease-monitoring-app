@@ -170,15 +170,17 @@ async def upload_image(
     # 读取文件内容
     file_content = await file.read()
     
-    # 上传到 MinIO
     try:
-        url, object_name = minio_service.upload_file(
-            file_data=file_content,
-            filename=file.filename or "image.jpg",
-            content_type=file.content_type,
-            bucket_name="usageguides"  # 使用 usageguides bucket（不含连字符）
+        file_key, md5_hash, _ = minio_service.upload_file(
+            file_content, 
+            "system",
+            "guides",
+            "usageguides",
+            file.content_type or "image/jpeg",
+            bucket_name="usageguides"
         )
-        return {"url": url, "filename": object_name}
+        url = minio_service.get_presigned_url(file_key, bucket_name="usageguides")
+        return {"url": url, "filename": file_key}
     except Exception as e:
         print(f"图片上传失败: {e}")
         import traceback
@@ -205,15 +207,18 @@ async def upload_video(
     # 读取文件内容
     file_content = await file.read()
     
-    # 上传到 MinIO
     try:
-        url, object_name = minio_service.upload_file(
-            file_data=file_content,
-            filename=file.filename or "video.mp4",
-            content_type=file.content_type,
-            bucket_name="usageguides"  # 使用 usageguides bucket（不含连字符）
+        file_key, md5_hash, _ = minio_service.upload_file(
+            file_content, 
+            "system",
+            "guides",
+            "usageguides",
+            file.content_type or "video/mp4",
+            bucket_name="usageguides",
+            compress=False
         )
-        return {"url": url, "filename": object_name}
+        url = minio_service.get_presigned_url(file_key, bucket_name="usageguides")
+        return {"url": url, "filename": file_key}
     except Exception as e:
         print(f"视频上传失败: {e}")
         import traceback

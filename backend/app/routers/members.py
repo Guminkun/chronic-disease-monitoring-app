@@ -295,14 +295,17 @@ async def upload_avatar(
         image.save(output_buffer, format='JPEG', quality=85)
         compressed_content = output_buffer.getvalue()
         
-        url, object_name = minio_service.upload_file(
-            file_data=compressed_content,
-            filename=f"avatar_{current_user.id}.jpg",
-            content_type="image/jpeg",
+        file_key, md5_hash, _ = minio_service.upload_file(
+            compressed_content, 
+            str(current_user.id),
+            "avatar",
+            "avatars",
+            "image/jpeg",
             bucket_name="avatars"
         )
+        url = minio_service.get_presigned_url(file_key, bucket_name="avatars")
         
-        return {"url": url, "filename": object_name}
+        return {"url": url, "filename": file_key}
     except Exception as e:
         print(f"头像上传失败: {e}")
         import traceback

@@ -148,7 +148,7 @@ const loadRecord = async (id: string) => {
 
 onLoad((options) => {
   if (options?.id) {
-    fetchDetail(options.id)
+    loadRecord(options.id)
   }
 })
 </script>
