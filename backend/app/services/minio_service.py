@@ -6,12 +6,43 @@ import io
 import uuid
 import hashlib
 import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Any
 from pathlib import Path
 from PIL import Image
 import tempfile
 
 logger = get_logger(__name__)
+
+
+def generate_presigned_urls_for_reports(reports: List[Any], bucket_name: Optional[str] = None) -> List[Any]:
+    """
+    为报告列表动态生成presigned URL
+    
+    Args:
+        reports: 报告对象列表
+        bucket_name: MinIO bucket名称
+    
+    Returns:
+        处理后的报告列表（image_url和thumbnail_url已转换为presigned URL）
+    """
+    from .minio_service import minio_service
+    
+    target_bucket = bucket_name or minio_service.bucket_name
+    
+    for report in reports:
+        if report.image_url and not report.image_url.startswith('http'):
+            try:
+                report.image_url = minio_service.get_presigned_url(report.image_url, bucket_name=target_bucket)
+            except Exception as e:
+                logger.warning(f"Failed to generate presigned URL for report {report.id}: {e}")
+        
+        if report.thumbnail_url and not report.thumbnail_url.startswith('http'):
+            try:
+                report.thumbnail_url = minio_service.get_presigned_url(report.thumbnail_url, bucket_name=target_bucket)
+            except Exception as e:
+                logger.warning(f"Failed to generate thumbnail URL for report {report.id}: {e}")
+    
+    return reports
 
 
 class MinioService:

@@ -22,9 +22,15 @@
                 v-for="record in records" 
                 :key="record.id"
                 class="report-item"
-                @click="openDetail(record)"
+                :class="{ 'item-selected': selectedIds.includes(record.id) }"
+                @click="handleItemClick(record)"
                 @longpress="openItemMenu(record)"
               >
+                <view v-if="isSelectMode" class="select-checkbox" @click.stop="toggleSelect(record.id)">
+                  <view class="checkbox-inner" :class="{ checked: selectedIds.includes(record.id) }">
+                    <text v-if="selectedIds.includes(record.id)" class="check-icon">✓</text>
+                  </view>
+                </view>
                 <view class="report-thumb">
                   <image 
                     v-if="record.image_url" 
@@ -100,8 +106,26 @@
       </view>
     </view>
 
+    <!-- 批量操作栏 -->
+    <view v-if="isSelectMode" class="batch-action-bar">
+      <view class="select-all-btn" @click="toggleSelectAll">
+        <view class="checkbox-inner" :class="{ checked: isAllSelected }">
+          <text v-if="isAllSelected" class="check-icon">✓</text>
+        </view>
+        <text class="select-all-text">全选</text>
+      </view>
+      <view class="batch-actions">
+        <view class="action-btn delete-btn" @click="confirmBatchDelete">
+          <text class="action-text">删除 ({{ selectedIds.length }})</text>
+        </view>
+        <view class="action-btn cancel-btn" @click="cancelSelectMode">
+          <text class="action-text">取消</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 底部悬浮添加按钮 -->
-    <view class="floating-add-btn" @click="showUploadOptions">
+    <view v-if="!isSelectMode" class="floating-add-btn" @click="showUploadOptions">
       <text class="add-text">添加病历</text>
     </view>
 
@@ -117,7 +141,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { getMedicalRecords, deleteMedicalRecord, uploadMedicalRecord } from '@/api/medical-record'
+import { getMedicalRecords, deleteMedicalRecord, uploadMedicalRecord, batchDeleteMedicalRecords } from '@/api/medical-record'
 import { useMemberStore } from '@/stores/member'
 import { onShow } from '@dcloudio/uni-app'
 import { safeNavigate } from '@/utils/navigate'
@@ -132,8 +156,14 @@ const uploading = ref(false)
 const uploadProgress = ref('')
 const uploadHint = ref('')
 const folderExpanded = ref(true)
+const isSelectMode = ref(false)
+const selectedIds = ref<string[]>([])
 
 const totalCount = computed(() => records.value.length)
+
+const isAllSelected = computed(() => {
+  return records.value.length > 0 && selectedIds.value.length === records.value.length
+})
 
 const formatDate = (timeStr: string) => {
   if (!timeStr) return '-'
@@ -245,6 +275,68 @@ const toggleFolder = () => {
   folderExpanded.value = !folderExpanded.value
 }
 
+const handleItemClick = (record: any) => {
+  if (isSelectMode.value) {
+    toggleSelect(record.id)
+  } else {
+    openDetail(record)
+  }
+}
+
+const toggleSelect = (id: string) => {
+  const index = selectedIds.value.indexOf(id)
+  if (index > -1) {
+    selectedIds.value.splice(index, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = records.value.map(r => r.id)
+  }
+}
+
+const enterSelectMode = () => {
+  isSelectMode.value = true
+  selectedIds.value = []
+}
+
+const cancelSelectMode = () => {
+  isSelectMode.value = false
+  selectedIds.value = []
+}
+
+const confirmBatchDelete = () => {
+  if (selectedIds.value.length === 0) {
+    uni.showToast({ title: '请选择要删除的病历', icon: 'none' })
+    return
+  }
+
+  uni.showModal({
+    title: '确认删除',
+    content: `确定要删除选中的 ${selectedIds.value.length} 份病历吗？删除后不可恢复。`,
+    success: async (res) => {
+      if (res.confirm) {
+        uni.showLoading({ title: '删除中...' })
+        try {
+          await batchDeleteMedicalRecords(selectedIds.value)
+          records.value = records.value.filter(r => !selectedIds.value.includes(r.id))
+          uni.showToast({ title: '删除成功', icon: 'success' })
+          cancelSelectMode()
+        } catch (e) {
+          uni.showToast({ title: '删除失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+        }
+      }
+    }
+  })
+}
+
 const openDetail = (record: any) => {
   if (!record?.id) return
   uni.navigateTo({
@@ -274,10 +366,13 @@ const deleteOne = (record: any) => {
 }
 
 const openItemMenu = (record: any) => {
+  if (isSelectMode.value) return
+  
   uni.showActionSheet({
-    itemList: ['删除'],
+    itemList: ['删除', '批量管理'],
     success: (res) => {
       if (res.tapIndex === 0) deleteOne(record)
+      else if (res.tapIndex === 1) enterSelectMode()
     }
   })
 }
@@ -296,7 +391,6 @@ onShow(() => {
   padding-bottom: 80px;
 }
 
-/* 底部悬浮添加按钮 */
 .floating-add-btn {
   position: fixed;
   left: 50%;
@@ -429,6 +523,41 @@ onShow(() => {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.report-item.item-selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.select-checkbox {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 10;
+}
+
+.checkbox-inner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-inner.checked {
+  border-color: #3b82f6;
+  background: #3b82f6;
+}
+
+.check-icon {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .report-thumb {
@@ -676,5 +805,68 @@ onShow(() => {
 .uploading-hint {
   font-size: 14px;
   color: #64748b;
+}
+
+.batch-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  padding-bottom: 20px;
+  z-index: 100;
+}
+
+.select-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-all-text {
+  font-size: 14px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn {
+  background: #ef4444;
+}
+
+.delete-btn .action-text {
+  color: #ffffff;
+}
+
+.cancel-btn {
+  background: #f1f5f9;
+}
+
+.cancel-btn .action-text {
+  color: #64748b;
+}
+
+.action-text {
+  font-size: 14px;
+  font-weight: 600;
 }
 </style>

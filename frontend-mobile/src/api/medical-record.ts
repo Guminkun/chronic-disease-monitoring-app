@@ -45,6 +45,14 @@ export function deleteMedicalRecord(id: string) {
   })
 }
 
+export function batchDeleteMedicalRecords(ids: string[]) {
+  return request({
+    url: '/patients/medical-records/batch-delete',
+    method: 'POST',
+    data: { ids }
+  })
+}
+
 export function uploadMedicalRecord(filePath: string, memberId?: string) {
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token')

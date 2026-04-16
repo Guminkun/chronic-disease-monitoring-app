@@ -330,6 +330,11 @@ def get_my_reports(
     else:
         reports = [r for r in reports if r.member_id is None or r.member_id == target_member_id]
     
+    from ..services.minio_service import generate_presigned_urls_for_reports
+    from ..config import settings
+    bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
+    reports = generate_presigned_urls_for_reports(reports, bucket)
+    
     return reports
 
 @router.post("/readings", response_model=schemas.HealthReadingResponse, summary="录入健康数据", description="录入血压、血糖、体重等健康指标数据。")
@@ -665,6 +670,11 @@ def get_medical_records(
     
     records = query.order_by(models.Report.created_at.desc()).all()
     
+    from ..services.minio_service import generate_presigned_urls_for_reports, minio_service
+    from ..config import settings
+    bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
+    records = generate_presigned_urls_for_reports(records, bucket)
+    
     return records
 
 
@@ -693,7 +703,50 @@ def get_medical_record_detail(
     if not record:
         raise HTTPException(status_code=404, detail="Medical record not found")
     
+    from ..services.minio_service import generate_presigned_urls_for_reports
+    from ..config import settings
+    bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
+    generate_presigned_urls_for_reports([record], bucket)
+    
     return record
+
+
+@router.post("/medical-records/batch-delete")
+def batch_delete_medical_records(
+    request: schemas.BatchDeleteRequestUUID,
+    current_user: models.User = Depends(dependencies.get_current_active_user),
+    db: Session = Depends(dependencies.get_db)
+):
+    """
+    批量删除病历报告
+    """
+    import uuid
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    
+    uuid_ids = []
+    for id_str in request.ids:
+        try:
+            uuid_ids.append(uuid.UUID(id_str))
+        except ValueError:
+            pass
+    
+    if not uuid_ids:
+        return {"success": True, "deleted_count": 0}
+    
+    deleted_count = db.query(models.Report).filter(
+        models.Report.id.in_(uuid_ids),
+        models.Report.patient_id == patient.id,
+        models.Report.report_type == '病历报告'
+    ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    return {"success": True, "deleted_count": deleted_count}
 
 
 @router.delete("/medical-records/{record_id}")
@@ -772,7 +825,6 @@ async def upload_medical_record(
             file.content_type or "image/jpeg",
             bucket_name=bucket
         )
-        minio_url = minio_svc.get_presigned_url(file_key, bucket_name=bucket)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
     
@@ -803,8 +855,10 @@ async def upload_medical_record(
         report_date=report_date,
         hospital_name=medical_fields.get('hospital', ''),
         report_type='病历报告',
-        image_url=minio_url,
+        image_url=file_key,
+        thumbnail_url=thumbnail_key,
         file_name=file.filename,
+        file_md5=md5_hash,
         status=models.ReportStatus.normal,
         data=report_data,
         summary=summary[:2000] if summary else ""

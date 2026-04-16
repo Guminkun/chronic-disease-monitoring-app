@@ -155,6 +155,14 @@ export const deleteReport = (id: string) => {
     })
 }
 
+export const batchDeleteReports = (ids: string[]) => {
+    return request({
+        url: '/reports/batch-delete',
+        method: 'POST',
+        data: { ids }
+    })
+}
+
 export const getTrends = (params?: { report_type?: string, metric_names?: string[], start_date?: string, end_date?: string }) => {
     return request({
         url: '/reports/trends',

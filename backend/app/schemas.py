@@ -712,6 +712,9 @@ class MedicationResponse(MedicationBase):
 class BatchDeleteRequest(BaseModel):
     ids: List[int]
 
+class BatchDeleteRequestUUID(BaseModel):
+    ids: List[str]
+
 class BatchStatusUpdateRequest(BaseModel):
     ids: List[int]
     is_active: bool

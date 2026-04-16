@@ -275,6 +275,11 @@ def read_report(
         # Check if report belongs to this patient
         if report.patient.user_id != current_user.id:
              raise HTTPException(status_code=403, detail="Not authorized to view this report")
+    
+    from ..services.minio_service import generate_presigned_urls_for_reports
+    from ..config import settings
+    bucket = settings.MINIO_BUCKET_REPORT or "jianchabaogao"
+    generate_presigned_urls_for_reports([report], bucket)
              
     return report
 
@@ -333,6 +338,46 @@ def update_report(
     db.refresh(report)
     return report
 
+
+@router.post("/batch-delete")
+def batch_delete_reports(
+    request: schemas.BatchDeleteRequestUUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    """
+    批量删除报告
+    """
+    import uuid
+    uuid_ids = []
+    for id_str in request.ids:
+        try:
+            uuid_ids.append(uuid.UUID(id_str))
+        except ValueError:
+            pass
+    
+    if not uuid_ids:
+        return {"success": True, "deleted_count": 0}
+    
+    if current_user.role == models.UserRole.patient:
+        patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient profile not found")
+        
+        deleted_count = db.query(models.Report).filter(
+            models.Report.id.in_(uuid_ids),
+            models.Report.patient_id == patient.id
+        ).delete(synchronize_session=False)
+    else:
+        deleted_count = db.query(models.Report).filter(
+            models.Report.id.in_(uuid_ids)
+        ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    return {"success": True, "deleted_count": deleted_count}
+
+
 @router.delete("/{report_id}", status_code=204)
 def delete_report(
     report_id: UUID4,
@@ -360,6 +405,7 @@ def delete_report(
          raise HTTPException(status_code=500, detail="Failed to delete report")
     
     return
+
 
 LAB_KEYWORDS = [
     '血常规', '尿常规', '肝功能', '肾功能', '血糖', '血脂', '电解质',
@@ -450,7 +496,6 @@ async def auto_classify_report(
             file.content_type or "image/jpeg",
             bucket_name=bucket
         )
-        minio_url = minio_service.get_presigned_url(file_key, bucket_name=bucket)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
     
@@ -506,8 +551,10 @@ async def auto_classify_report(
         report_date=report_date,
         hospital_name=hospital_name,
         report_type=report_type_name,
-        image_url=minio_url,
+        image_url=file_key,
+        thumbnail_url=thumbnail_key,
         file_name=file.filename,
+        file_md5=md5_hash,
         status=models.ReportStatus.normal,
         data=report_data,
         summary=ocr_text[:2000] if ocr_text else ""
