@@ -1,0 +1,347 @@
+{
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "首页"
+			}
+		},
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/register/patient-register",
+			"style": {
+				"navigationBarTitleText": "注册",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/register/register-selection",
+			"style": {
+				"navigationBarTitleText": "注册",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/todo/index",
+			"style": {
+				"navigationBarTitleText": "待办"
+			}
+		},
+		{
+			"path": "pages/revisit/plan",
+			"style": {
+				"navigationBarTitleText": "复诊计划",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication/index",
+			"style": {
+				"navigationBarTitleText": "按时吃药",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/monitor/index",
+			"style": {
+				"navigationBarTitleText": "居家监测",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/monitor/metric-detail",
+			"style": {
+				"navigationBarTitleText": "指标监测",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication/add",
+			"style": {
+				"navigationBarTitleText": "用药提醒",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/medication/history",
+			"style": {
+				"navigationBarTitleText": "历史用药",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/medication/makeup",
+			"style": {
+				"navigationBarTitleText": "漏服补卡",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/profile/index",
+			"style": {
+				"navigationBarTitleText": "我的"
+			}
+		},
+		{
+			"path": "pages/doctor/home",
+			"style": {
+				"navigationBarTitleText": "医生工作台",
+				"navigationBarBackgroundColor": "#ffffff",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/doctor/add-patient",
+			"style": {
+				"navigationBarTitleText": "添加患者",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/doctor/patient-detail",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/report/report",
+			"style": {
+				"navigationBarTitleText": "检查报告",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/report/detail",
+			"style": {
+				"navigationBarTitleText": "报告详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/report/trends",
+			"style": {
+				"navigationBarTitleText": "指标趋势",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medical-record/list",
+			"style": {
+				"navigationBarTitleText": "病历报告",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medical-record/detail",
+			"style": {
+				"navigationBarTitleText": "病历详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medical-record/add",
+			"style": {
+				"navigationBarTitleText": "添加病历",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/medical-record/upload",
+			"style": {
+				"navigationBarTitleText": "上传病历",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/report/upload",
+			"style": {
+				"navigationBarTitleText": "上传检查报告",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/disease/manage",
+			"style": {
+				"navigationBarTitleText": "慢性病管理",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/patient/my-doctor",
+			"style": {
+				"navigationBarTitleText": "我的医生",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/doctor/bind-doctor",
+			"style": {
+				"navigationBarTitleText": "医患绑定",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/chat/chat",
+			"style": {
+				"navigationBarTitleText": "聊天",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/education/index",
+			"style": {
+				"navigationBarTitleText": "健康宣教",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/education/detail",
+			"style": {
+				"navigationBarTitleText": "详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/feedback/submit",
+			"style": {
+				"navigationBarTitleText": "意见反馈",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/feedback/history",
+			"style": {
+				"navigationBarTitleText": "反馈记录",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/feedback/detail",
+			"style": {
+				"navigationBarTitleText": "反馈详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/usage-guide/index",
+			"style": {
+				"navigationBarTitleText": "使用说明",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/usage-guide/detail",
+			"style": {
+				"navigationBarTitleText": "说明详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/member/list",
+			"style": {
+				"navigationBarTitleText": "成员管理",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/member/add",
+			"style": {
+				"navigationBarTitleText": "新增成员",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/member/edit",
+			"style": {
+				"navigationBarTitleText": "编辑成员",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/notification/index",
+			"style": {
+				"navigationBarTitleText": "消息中心",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication-guide/index",
+			"style": {
+				"navigationBarTitleText": "药品说明",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication-guide/category",
+			"style": {
+				"navigationBarTitleText": "药品分类",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication-guide/list",
+			"style": {
+				"navigationBarTitleText": "药品列表",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication-guide/search",
+			"style": {
+				"navigationBarTitleText": "搜索药品",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/medication-guide/detail",
+			"style": {
+				"navigationBarTitleText": "药品详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "慢病监测",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"custom": true,
+		"color": "#94a3b8",
+		"selectedColor": "#3b82f6",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "white",
+		"fontSize": "11px",
+		"height": "50px",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/medication/index",
+				"text": "用药"
+			},
+			{
+				"pagePath": "pages/monitor/index",
+				"text": "监测"
+			},
+			{
+				"pagePath": "pages/profile/index",
+				"text": "我的"
+			}
+		]
+	}
+}

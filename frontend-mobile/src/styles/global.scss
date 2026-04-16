@@ -1,0 +1,283 @@
+/* 
+ * 慢性病监测系统 - 全局设计系统
+ * 基于 Frontend Design 最佳实践
+ * 更新：增强卡片与背景的视觉反差
+ */
+
+/* ── CSS Reset & Base ── */
+page {
+  /* 背景色系统 - 更深的灰蓝色调，增强与白色卡片的对比 */
+  --color-bg-base: #E8ECF2;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-muted: #F3F5F9;
+  --color-bg-subtle: #E8F4FD;
+  
+  /* 卡片专用背景色 - 纯白 + 光泽感渐变 */
+  --color-card-bg: #FFFFFF;
+  --color-card-bg-accent: #FCFCFD;
+  --color-card-border: rgba(120, 130, 150, 0.18);
+  --color-card-border-accent: rgba(59, 130, 246, 0.12);
+  
+  /* 主色 */
+  --color-primary: #3B82F6;
+  --color-primary-light: #60A5FA;
+  --color-primary-dark: #2563EB;
+  
+  /* 语义色 */
+  --color-success: #22C55E;
+  --color-warning: #F97316;
+  --color-error: #EF4444;
+  --color-info: #64748B;
+  
+  /* 文字颜色 */
+  --color-text-primary: #1E293B;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+  
+  /* 间距系统 */
+  --spacing-xs: 16rpx;
+  --spacing-sm: 24rpx;
+  --spacing-md: 32rpx;
+  --spacing-lg: 48rpx;
+  --spacing-xl: 64rpx;
+  
+  /* 圆角系统 */
+  --radius-sm: 12rpx;
+  --radius-md: 20rpx;
+  --radius-lg: 28rpx;
+  --radius-xl: 36rpx;
+  
+  /* 阴影系统 - 显著增强卡片层次感与浮起效果 */
+  --shadow-xs: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 4rpx 16rpx rgba(0, 0, 0, 0.10);
+  --shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.14);
+  --shadow-lg: 0 16rpx 48rpx rgba(0, 0, 0, 0.18);
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.08), 0 12rpx 40rpx rgba(0, 0, 0, 0.12), 0 0 0 1rpx rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 6rpx 20rpx rgba(0, 0, 0, 0.10), 0 16rpx 48rpx rgba(0, 0, 0, 0.14), 0 0 0 1rpx rgba(59, 130, 246, 0.12);
+  
+  /* 过渡动画 */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+/* ── Utility Classes ── */
+.bg-base {
+  background-color: var(--color-bg-base);
+}
+
+.bg-elevated {
+  background-color: var(--color-bg-elevated);
+}
+
+.bg-muted {
+  background-color: var(--color-bg-muted);
+}
+
+.bg-subtle {
+  background-color: var(--color-bg-subtle);
+}
+
+/* ─── Typography ─── */
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-inverse {
+  color: var(--color-text-inverse);
+}
+
+/* ─── Spacing ─── */
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
+
+.m-xs { margin: var(--spacing-xs); }
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
+
+/* ─── Shadows ─── */
+.shadow-xs { box-shadow: var(--shadow-xs); }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-card { box-shadow: var(--shadow-card); }
+
+/* ─── Border Radius ─── */
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-full { border-radius: 9999rpx; }
+
+/* ─── Components ─── */
+
+/* Card Base - 显著增强视觉层次与反差 */
+.card {
+  background: linear-gradient(180deg, var(--color-card-bg) 0%, var(--color-card-bg-accent) 100%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--spacing-md);
+  border: 1rpx solid var(--color-card-border);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1rpx;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+}
+
+.card:active {
+  transform: translateY(2rpx);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Button Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx 32rpx;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.btn-primary:active {
+  background-color: var(--color-primary-dark);
+}
+
+/* Input Base */
+.input {
+  width: 100%;
+  height: 88rpx;
+  background-color: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+  padding: 0 var(--spacing-md);
+  font-size: 32rpx;
+  color: var(--color-text-primary);
+  border: 2rpx solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.input:focus {
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 6rpx rgba(59, 130, 246, 0.1);
+}
+
+/* ─── Animation Utilities ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-base);
+}
+
+.animate-slide-up {
+  animation: slideUp var(--transition-base);
+}
+
+/* ─── Accessibility ─── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 3rpx solid var(--color-primary);
+  outline-offset: 2rpx;
+}
+
+/* ─── Page Layout ─── */
+.page {
+  min-height: 100vh;
+  background-color: var(--color-bg-base);
+}
+
+.page-header {
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-elevated);
+}
+
+.page-content {
+  padding: var(--spacing-md);
+}
+
+/* ─── Safe Areas ─── */
+.safe-area-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── Scrollbar Styling ─── */
+::-webkit-scrollbar {
+  width: 8rpx;
+  height: 8rpx;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
