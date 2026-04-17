@@ -446,6 +446,10 @@ class Notification(Base):
     is_read = Column(Boolean, default=False)
     read_at = Column(DateTime(timezone=True))
     
+    is_handled = Column(Boolean, default=False)
+    handled_at = Column(DateTime(timezone=True))
+    handler_type = Column(String(50))
+    
     priority = Column(Integer, default=0)
     extra_data = Column(JSON)
     

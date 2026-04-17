@@ -11,29 +11,33 @@
         </view>
         <view 
           class="filter-tab" 
+          :class="{ active: currentFilter === 'unhandled' }" 
+          @click="setFilter('unhandled')"
+        >
+          <text>待处理</text>
+          <view class="badge" v-if="unhandledCount > 0">{{ unhandledCount > 99 ? '99+' : unhandledCount }}</view>
+        </view>
+        <view 
+          class="filter-tab" 
+          :class="{ active: currentFilter === 'handled' }" 
+          @click="setFilter('handled')"
+        >
+          <text>已处理</text>
+        </view>
+        <view 
+          class="filter-tab" 
           :class="{ active: currentFilter === 'unread' }" 
           @click="setFilter('unread')"
         >
           <text>未读</text>
           <view class="badge" v-if="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</view>
         </view>
-        <view 
-          class="filter-tab" 
-          :class="{ active: currentFilter === 'health' }" 
-          @click="setFilter('health')"
-        >
-          <text>健康提醒</text>
-        </view>
-        <view 
-          class="filter-tab" 
-          :class="{ active: currentFilter === 'system' }" 
-          @click="setFilter('system')"
-        >
-          <text>系统通知</text>
-        </view>
       </view>
-      <view class="action-btn" @click="markAllRead" v-if="unreadCount > 0">
+      <view class="action-btn" @click="markAllRead" v-if="unreadCount > 0 && currentFilter !== 'handled'">
         <text>全部已读</text>
+      </view>
+      <view class="action-btn" @click="handleAllNotifications" v-if="unhandledCount > 0 && currentFilter === 'unhandled'">
+        <text>全部处理</text>
       </view>
     </view>
 
@@ -45,7 +49,7 @@
       :refresher-triggered="isRefreshing"
       @refresherrefresh="onRefresh"
     >
-      <view v-for="item in notifications" :key="item.id" class="notification-item" @click="handleItemClick(item)">
+      <view v-for="item in notifications" :key="item.id" class="notification-item">
         <view class="item-header">
           <view class="member-tag" v-if="item.member_nickname">
             <text class="member-icon">{{ getMemberIcon(item.member_relation) }}</text>
@@ -55,13 +59,25 @@
             <text>{{ formatTime(item.created_at) }}</text>
           </view>
         </view>
-        <view class="item-content">
+        <view class="item-content" @click="handleItemClick(item)">
           <view class="item-title-row">
             <view class="type-dot" :class="getTypeClass(item.type)"></view>
             <text class="item-title">{{ item.title }}</text>
             <view class="unread-dot" v-if="!item.is_read"></view>
           </view>
           <text class="item-text">{{ item.content }}</text>
+        </view>
+        <view class="item-actions" v-if="!item.is_handled && currentFilter !== 'handled'">
+          <view class="action-btn-item primary" @click="handleView(item)">
+            <text>查看详情</text>
+          </view>
+          <view class="action-btn-item secondary" @click="handleMarkHandled(item)">
+            <text>标记已处理</text>
+          </view>
+        </view>
+        <view class="item-status" v-if="item.is_handled">
+          <text class="status-text">✓ 已处理</text>
+          <text class="status-time">{{ formatTime(item.handled_at) }}</text>
         </view>
       </view>
 
@@ -90,15 +106,20 @@ import {
   getNotifications, 
   markAllNotificationsAsRead, 
   markNotificationAsRead,
+  markNotificationAsHandled,
+  markAllNotificationsAsHandled,
   type NotificationItem 
 } from '@/api/notification'
 import { useUserStore } from '@/stores/user'
+import { useMemberStore } from '@/stores/member'
 
 const userStore = useUserStore()
+const memberStore = useMemberStore()
 
 const notifications = ref<NotificationItem[]>([])
 const currentFilter = ref('all')
 const unreadCount = ref(0)
+const unhandledCount = ref(0)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const hasMore = ref(true)
@@ -126,6 +147,11 @@ const loadNotifications = async () => {
     
     if (currentFilter.value === 'unread') {
       params.is_read = false
+      params.is_handled = false
+    } else if (currentFilter.value === 'unhandled') {
+      params.is_handled = false
+    } else if (currentFilter.value === 'handled') {
+      params.is_handled = true
     } else if (currentFilter.value === 'health' || currentFilter.value === 'system') {
       params.category = currentFilter.value
     }
@@ -140,6 +166,7 @@ const loadNotifications = async () => {
     }
     
     unreadCount.value = res.unread_count || 0
+    unhandledCount.value = res.unhandled_count || 0
     hasMore.value = items.length >= pageSize
   } catch (error) {
     console.error('加载通知失败:', error)
@@ -185,12 +212,69 @@ const handleItemClick = async (item: NotificationItem) => {
       console.error('标记已读失败:', error)
     }
   }
+}
+
+const handleView = async (item: NotificationItem) => {
+  // 切换成员
+  if (item.member_id) {
+    await memberStore.switchMember(item.member_id)
+  }
   
+  // 标记已读
+  if (!item.is_read) {
+    await markNotificationAsRead(item.id)
+    item.is_read = true
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
+  }
+  
+  // 跳转到对应页面
   if (item.type === 'revisit') {
     uni.navigateTo({ url: '/pages/revisit/plan' })
   } else if (item.type === 'medication') {
     uni.switchTab({ url: '/pages/medication/index' })
   }
+}
+
+const handleMarkHandled = async (item: NotificationItem) => {
+  try {
+    await markNotificationAsHandled(item.id)
+    item.is_handled = true
+    item.handled_at = new Date().toISOString()
+    unhandledCount.value = Math.max(0, unhandledCount.value - 1)
+    uni.showToast({ title: '已标记为处理', icon: 'success' })
+    
+    // 如果当前是待处理筛选，从列表中移除
+    if (currentFilter.value === 'unhandled') {
+      notifications.value = notifications.value.filter(n => n.id !== item.id)
+    }
+  } catch (error) {
+    console.error('标记已处理失败:', error)
+    uni.showToast({ title: '操作失败', icon: 'none' })
+  }
+}
+
+const handleAllNotifications = async () => {
+  uni.showModal({
+    title: '确认操作',
+    content: '确定将所有待处理消息标记为已处理吗？',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await markAllNotificationsAsHandled()
+          uni.showToast({ title: '已全部处理', icon: 'success' })
+          
+          // 重新加载消息列表
+          page.value = 0
+          hasMore.value = true
+          notifications.value = []
+          await loadNotifications()
+        } catch (error) {
+          console.error('批量标记失败:', error)
+          uni.showToast({ title: '操作失败', icon: 'none' })
+        }
+      }
+    }
+  })
 }
 
 const getMemberIcon = (relation?: string) => {
@@ -252,6 +336,9 @@ onShow(() => {
 .page-wrap {
   min-height: 100vh;
   background-color: #f5f7fa;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .filter-bar {
@@ -261,11 +348,14 @@ onShow(() => {
   padding: 12px 16px;
   background: #ffffff;
   border-bottom: 1px solid #f0f0f0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .filter-tabs {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .filter-tab {
@@ -318,6 +408,8 @@ onShow(() => {
 .notification-list {
   height: calc(100vh - 60px);
   padding: 12px 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .notification-item {
@@ -326,6 +418,9 @@ onShow(() => {
   padding: 14px 16px;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .item-header {
@@ -333,6 +428,7 @@ onShow(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  width: 100%;
 }
 
 .member-tag {
@@ -342,6 +438,7 @@ onShow(() => {
   background: #f0f9ff;
   padding: 4px 10px;
   border-radius: 12px;
+  flex-shrink: 0;
 }
 
 .member-icon {
@@ -352,23 +449,28 @@ onShow(() => {
   font-size: 12px;
   color: #0284c7;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .item-time text {
   font-size: 12px;
   color: #94a3b8;
+  white-space: nowrap;
 }
 
 .item-content {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  overflow: hidden;
 }
 
 .item-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .type-dot {
@@ -389,6 +491,10 @@ onShow(() => {
   font-weight: 600;
   color: #1e293b;
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .unread-dot {
@@ -404,6 +510,10 @@ onShow(() => {
   color: #64748b;
   line-height: 1.5;
   padding-left: 16px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .loading-more,
@@ -434,5 +544,57 @@ onShow(() => {
 .empty-text {
   font-size: 14px;
   color: #94a3b8;
+}
+
+.item-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.action-btn-item {
+  flex: 1;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.action-btn-item.primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.action-btn-item.secondary {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1rpx solid #e2e8f0;
+}
+
+.item-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  background: #f0fdf4;
+  border-radius: 12rpx;
+  border: 1rpx solid #bbf7d0;
+}
+
+.status-text {
+  font-size: 26rpx;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.status-time {
+  font-size: 22rpx;
+  color: #64748b;
 }
 </style>

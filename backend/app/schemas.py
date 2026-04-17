@@ -612,6 +612,9 @@ class NotificationResponse(NotificationBase):
     patient_id: UUID4
     is_read: bool
     read_at: Optional[datetime]
+    is_handled: bool = False
+    handled_at: Optional[datetime] = None
+    handler_type: Optional[str] = None
     created_at: datetime
     member_nickname: Optional[str] = Field(None, description="成员昵称")
     member_relation: Optional[str] = Field(None, description="成员关系")
@@ -624,6 +627,7 @@ class NotificationListResponse(BaseModel):
     items: List[NotificationResponse]
     total: int
     unread_count: int
+    unhandled_count: int = 0
 
 # --- Medication Dictionary ---
 class MedicationBase(BaseModel):

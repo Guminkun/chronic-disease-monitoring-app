@@ -5,23 +5,28 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     token: uni.getStorageSync('token') || '',
     user: null as any,
-    role: uni.getStorageSync('role') || ''
+    role: uni.getStorageSync('role') || '',
+    userId: uni.getStorageSync('userId') || ''
   }),
   actions: {
     async login(loginForm: any) {
       const res: any = await login(loginForm)
       this.token = res.access_token
       this.role = res.role
+      this.userId = res.user_id || ''
       uni.setStorageSync('token', res.access_token)
       uni.setStorageSync('role', res.role)
+      uni.setStorageSync('userId', res.user_id || '')
       return res
     },
     async loginBySms(loginForm: { phone: string, code: string }) {
       const res: any = await loginBySms(loginForm)
       this.token = res.access_token
       this.role = res.role
+      this.userId = res.user_id || ''
       uni.setStorageSync('token', res.access_token)
       uni.setStorageSync('role', res.role)
+      uni.setStorageSync('userId', res.user_id || '')
       return res
     },
     async loginByWechat() {
@@ -33,8 +38,10 @@ export const useUserStore = defineStore('user', {
               const res: any = await loginByWechat({ code: loginRes.code })
               this.token = res.access_token
               this.role = res.role
+              this.userId = res.user_id || ''
               uni.setStorageSync('token', res.access_token)
               uni.setStorageSync('role', res.role)
+              uni.setStorageSync('userId', res.user_id || '')
               resolve(res)
             } catch (error) {
               reject(error)
@@ -55,8 +62,11 @@ export const useUserStore = defineStore('user', {
       this.token = ''
       this.user = null
       this.role = ''
+      this.userId = ''
       uni.removeStorageSync('token')
       uni.removeStorageSync('role')
+      uni.removeStorageSync('userId')
+      uni.removeStorageSync('hasLoggedInBefore')
       uni.switchTab({
         url: '/pages/index/index'
       })

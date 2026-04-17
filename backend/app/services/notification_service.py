@@ -85,13 +85,10 @@ class NotificationService:
     @staticmethod
     def generate_medication_reminders(db: Session, patient_id: Optional[UUID] = None):
         today = date.today()
-        remind_before_days = 3
+        remind_before_days = 7
         
         query = db.query(models.MedicationPlan).filter(
-            models.MedicationPlan.is_active == True,
-            models.MedicationPlan.end_date != None,
-            models.MedicationPlan.end_date >= today,
-            models.MedicationPlan.end_date <= today + timedelta(days=remind_before_days)
+            models.MedicationPlan.is_active == True
         )
         
         if patient_id:
@@ -101,9 +98,25 @@ class NotificationService:
         notifications = []
         
         for plan in plans:
-            if not plan.end_date:
+            days_left = None
+            
+            if plan.is_temporary and plan.end_date:
+                days_diff = (plan.end_date - today).days
+                if days_diff >= 0 and days_diff <= remind_before_days:
+                    days_left = days_diff
+            elif not plan.is_temporary:
+                stock = float(plan.stock or 0)
+                dosage_amount = float(plan.dosage_amount or 0)
+                times_per_day = len(plan.taken_times or [])
+                
+                if stock > 0 and dosage_amount > 0 and times_per_day > 0:
+                    daily_dose = dosage_amount * times_per_day
+                    calculated_days = int(stock / daily_dose)
+                    if calculated_days <= remind_before_days:
+                        days_left = calculated_days
+            
+            if days_left is None:
                 continue
-            days_left = (plan.end_date - today).days
             
             existing = db.query(models.Notification).filter(
                 models.Notification.source_type == "medication_plan",
@@ -114,17 +127,22 @@ class NotificationService:
             if existing:
                 continue
             
+            if plan.is_temporary:
+                content = f"您的药品 {plan.name} 即将用完（截止日期 {plan.end_date}），还有 {days_left} 天用量。"
+            else:
+                content = f"您的药品 {plan.name} 余量不足，预计还可维持 {days_left} 天，请及时补充。"
+            
             notification = NotificationService.create_notification(
                 db=db,
                 patient_id=plan.patient_id,
                 member_id=plan.member_id,
                 title="药品余量不足",
-                content=f"您的药品 {plan.name} 余量即将用完（截止日期 {plan.end_date}），请及时补充。还有 {days_left} 天用量。",
+                content=content,
                 type="medication",
                 category="health",
                 source_id=str(plan.id),
                 source_type="medication_plan",
-                priority=8 if days_left <= 1 else 4
+                priority=10 if days_left <= 1 else (8 if days_left <= 3 else 5)
             )
             notifications.append(notification)
         

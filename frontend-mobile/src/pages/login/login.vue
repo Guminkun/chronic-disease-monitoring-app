@@ -13,7 +13,7 @@
     <!-- 主标题区域 -->
     <view class="header-section">
       <text class="main-title">欢迎使用</text>
-      <text class="app-name">慢病管理系统</text>
+      <text class="app-name">慢小二</text>
     </view>
 
     <!-- 微信一键登录 -->
@@ -165,22 +165,39 @@ const canSubmit = computed(() => {
 
 onMounted(() => {
   // #ifdef MP-WEIXIN
-  // 在微信小程序环境下，自动尝试微信登录
-  autoWechatLogin()
+  // 在微信小程序环境下，检查登录状态
+  checkLoginStatus()
   // #endif
 })
 
-const autoWechatLogin = async () => {
+const checkLoginStatus = async () => {
   const token = uni.getStorageSync('token')
-  if (token) return
+  if (token) {
+    // 已有token，直接跳转
+    navigateAfterLogin()
+    return
+  }
   
+  // 检查是否登录过（token过期但之前登录过）
+  const hasLoggedInBefore = uni.getStorageSync('hasLoggedInBefore')
+  if (hasLoggedInBefore) {
+    // 之前登录过，自动尝试登录
+    autoWechatLogin()
+  }
+  // 否则等待用户手动点击登录按钮
+}
+
+const autoWechatLogin = async () => {
   loading.value = true
   try {
     await userStore.loginByWechat()
+    uni.setStorageSync('hasLoggedInBefore', true)
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => navigateAfterLogin(), 800)
   } catch (e: any) {
     console.log('Auto wechat login failed:', e)
+    // 自动登录失败，清除标记，让用户手动登录
+    uni.removeStorageSync('hasLoggedInBefore')
   } finally {
     loading.value = false
   }
@@ -251,9 +268,32 @@ const handleWechatLogin = async () => {
     return
   }
   
+  // 检查是否首次登录
+  const hasLoggedInBefore = uni.getStorageSync('hasLoggedInBefore')
+  if (!hasLoggedInBefore) {
+    // 首次登录，显示确认弹窗
+    uni.showModal({
+      title: '微信登录',
+      content: '是否使用微信账号登录慢小二？',
+      confirmText: '确认登录',
+      cancelText: '取消',
+      success: async (res) => {
+        if (res.confirm) {
+          await performWechatLogin()
+        }
+      }
+    })
+  } else {
+    // 非首次登录，直接登录
+    await performWechatLogin()
+  }
+}
+
+const performWechatLogin = async () => {
   loading.value = true
   try {
     await userStore.loginByWechat()
+    uni.setStorageSync('hasLoggedInBefore', true)
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => navigateAfterLogin(), 800)
   } catch (e: any) {

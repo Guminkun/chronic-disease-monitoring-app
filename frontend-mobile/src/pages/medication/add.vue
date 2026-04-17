@@ -275,6 +275,13 @@
             <text class="course-unit">天</text>
           </view>
         </view>
+
+        <!-- 长期用药剩余天数提示 -->
+        <view v-if="!isTemporary && remainingDays !== null" class="remaining-summary" :class="{ warning: remainingDays <= 7, danger: remainingDays <= 3 }">
+          <text class="summary-icon">{{ remainingDays <= 3 ? '⚠️' : '💊' }}</text>
+          <text class="summary-text">余量可维持 {{ remainingDays }} 天</text>
+          <text v-if="remainingDays <= 3" class="summary-hint">请及时补充药品</text>
+        </view>
       </view>
 
       <!-- 提醒设置卡片 -->
@@ -420,6 +427,16 @@ const durationDays = computed(() => {
   const end = new Date(form.value.end_date)
   const diff = Math.ceil((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1
   return diff > 0 ? diff : 0
+})
+
+const remainingDays = computed(() => {
+  if (isTemporary.value) return null
+  const stock = Number(form.value.stock) || 0
+  const perDose = Number(form.value.per_dose) || 0
+  if (stock <= 0 || perDose <= 0) return 0
+  const dailyDose = perDose * times.value.length
+  const days = Math.floor(stock / dailyDose)
+  return days
 })
 
 const isEndDateNear = computed(() => {
@@ -616,6 +633,14 @@ const onRemindSwitch = async (e: any) => {
 const times = ref<string[]>(['08:00', '12:00', '18:00'])
 const timePickerValue = computed(() => times.value[times.value.length - 1] || '08:00')
 
+const defaultTimesMap: Record<number, string[]> = {
+  0: ['08:00'],
+  1: ['08:00', '20:00'],
+  2: ['08:00', '12:00', '18:00'],
+  3: ['08:00', '12:00', '18:00', '22:00'],
+  4: ['08:00']
+}
+
 const onAddTime = (e: any) => {
   const t = String(e.detail.value || '').trim()
   if (!t || times.value.includes(t)) return
@@ -639,7 +664,21 @@ const removeTime = (t: string) => {
 const openDosePreset = () => {
   uni.showActionSheet({
     itemList: freqOptions,
-    success: (res: any) => { freqIndex.value = res.tapIndex }
+    success: (res: any) => {
+      const newFreqIndex = res.tapIndex
+      freqIndex.value = newFreqIndex
+      
+      if (newFreqIndex === 4) {
+        freqType.value = 'interval'
+      } else {
+        freqType.value = 'daily'
+      }
+      
+      const newTimes = defaultTimesMap[newFreqIndex]
+      if (newTimes) {
+        times.value = [...newTimes]
+      }
+    }
   })
 }
 
@@ -788,7 +827,7 @@ const handleConfirm = async () => {
     timing_condition: mealOptions[mealIndex.value],
     start_date: form.value.start_date,
     end_date: form.value.end_date || undefined,
-    duration_days: courseDays.value || undefined,
+    duration_days: isTemporary.value ? durationDays.value : (courseDays.value || undefined),
     patient_disease_id: pickedDiseaseId.value || undefined,
     notes: form.value.notes_text || undefined,
     is_temporary: isTemporary.value
@@ -861,8 +900,13 @@ const loadPlanDetails = async (id: number) => {
     form.value.interval_days = plan.frequency_type === 'interval' ? Number(plan.frequency_value) : 2
     form.value.stock = plan.stock || 0
     form.value.notes_text = plan.notes || ''
-    const freqMap: Record<number, number> = {1:0, 2:1, 3:2, 4:3}
-    freqIndex.value = freqMap[times.value.length] ?? 2
+    
+    if (plan.frequency_type === 'interval') {
+      freqIndex.value = 4
+    } else {
+      const freqMap: Record<number, number> = {1:0, 2:1, 3:2, 4:3}
+      freqIndex.value = freqMap[times.value.length] ?? 2
+    }
   } catch (e) { console.error('Failed to load plan details', e) }
 }
 
@@ -910,6 +954,22 @@ onShow(() => {
   background: #eef2f7;
   display: flex;
   flex-direction: column;
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+/* 导航栏 */
+
+
+
+
+/* 滚动内容 */
+.scroll-content {
+  flex: 1;
+  padding: 24rpx 32rpx;
+  padding-top: calc(24rpx + constant(safe-area-inset-top));
+  padding-top: calc(24rpx + env(safe-area-inset-top));
+  box-sizing: border-box;
 }
 
 /* 导航栏 */
@@ -1487,5 +1547,48 @@ onShow(() => {
 .value-text.warning {
   color: #f97316;
   font-weight: 600;
+}
+
+.remaining-summary {
+  margin-top: 20rpx;
+  padding: 20rpx 24rpx;
+  background: #f0fdf4;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.remaining-summary.warning {
+  background: #fff7ed;
+}
+
+.remaining-summary.danger {
+  background: #fef2f2;
+}
+
+.remaining-summary .summary-icon {
+  font-size: 28rpx;
+}
+
+.remaining-summary .summary-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.remaining-summary.warning .summary-text {
+  color: #f97316;
+}
+
+.remaining-summary.danger .summary-text {
+  color: #dc2626;
+}
+
+.remaining-summary .summary-hint {
+  font-size: 24rpx;
+  color: #dc2626;
+  margin-left: auto;
 }
 </style>

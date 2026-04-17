@@ -52,27 +52,52 @@ def get_notifications(current_user: models.User = Depends(dependencies.get_curre
             member_relation=member_relation
         ))
         
-    # 2. 用药余量通知 (未来3天)
-    # 基于 MedicationPlan.end_date
+    # 2. 用药余量通知 (未来7天)
     med_plans = db.query(models.MedicationPlan).filter(
         models.MedicationPlan.patient_id == patient.id,
-        models.MedicationPlan.is_active == True,
-        models.MedicationPlan.end_date >= today,
-        models.MedicationPlan.end_date <= today + timedelta(days=3)
+        models.MedicationPlan.is_active == True
     ).all()
     
     for plan in med_plans:
-        days_left = (plan.end_date - today).days
+        days_left = None
+        notification_date = None
+        
+        if plan.is_temporary and plan.end_date:
+            days_diff = (plan.end_date - today).days
+            if days_diff >= 0 and days_diff <= 7:
+                days_left = days_diff
+                notification_date = plan.end_date
+        elif not plan.is_temporary:
+            stock = float(plan.stock or 0)
+            dosage_amount = float(plan.dosage_amount or 0)
+            times_per_day = len(plan.taken_times or [])
+            
+            if stock > 0 and dosage_amount > 0 and times_per_day > 0:
+                daily_dose = dosage_amount * times_per_day
+                calculated_days = int(stock / daily_dose)
+                if calculated_days <= 7:
+                    days_left = calculated_days
+                    notification_date = today + timedelta(days=calculated_days)
+        
+        if days_left is None:
+            continue
+            
         member_nickname = plan.member.nickname if plan.member else None
         member_relation = plan.member.relation if plan.member else None
         member_id = plan.member_id
+        
+        if plan.is_temporary:
+            content = f"您的药品 {plan.name} 即将用完（截止日期 {plan.end_date}），还有 {days_left} 天用量。"
+        else:
+            content = f"您的药品 {plan.name} 余量不足，预计还可维持 {days_left} 天，请及时补充。"
+        
         notifications.append(schemas.PatientNotificationItem(
             id=f"med-{plan.id}",
             type="medication",
             title="药品余量不足",
-            content=f"您的药品 {plan.name} 余量即将用完（截止日期 {plan.end_date}），请及时补充。还有 {days_left} 天用量。",
+            content=content,
             days_left=days_left,
-            notification_date=plan.end_date,
+            notification_date=notification_date or today,
             member_id=member_id,
             member_nickname=member_nickname,
             member_relation=member_relation

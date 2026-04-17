@@ -1,11 +1,49 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { useUserStore } from "@/stores/user";
+
+const userStore = useUserStore();
+
 onLaunch(() => {
   console.log("App Launch");
+  // #ifdef MP-WEIXIN
+  // 微信小程序环境：自动检查登录状态
+  autoLoginIfNeeded();
+  // #endif
 });
+
+const autoLoginIfNeeded = async () => {
+  const token = uni.getStorageSync('token');
+  
+  // 如果已有token，直接恢复用户状态
+  if (token) {
+    try {
+      await userStore.fetchUserInfo();
+    } catch (e) {
+      console.log('Failed to fetch user info, token may be expired');
+      uni.removeStorageSync('token');
+    }
+    return;
+  }
+  
+  // 如果之前登录过，尝试自动登录
+  const hasLoggedInBefore = uni.getStorageSync('hasLoggedInBefore');
+  if (hasLoggedInBefore) {
+    try {
+      await userStore.loginByWechat();
+      console.log('Auto login succeeded');
+    } catch (e) {
+      console.log('Auto login failed:', e);
+      // 自动登录失败，清除标记
+      uni.removeStorageSync('hasLoggedInBefore');
+    }
+  }
+};
+
 onShow(() => {
   console.log("App Show");
 });
+
 onHide(() => {
   console.log("App Hide");
 });

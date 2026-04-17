@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from .. import models, schemas, dependencies, crud
 from ..database import get_db
+from ..services.notification_service import notification_service
 from pydantic import UUID4
 
 router = APIRouter(
@@ -15,6 +16,7 @@ router = APIRouter(
 def get_notifications(
     member_id: Optional[UUID4] = None,
     is_read: Optional[bool] = None,
+    is_handled: Optional[bool] = Query(None, description="是否已处理"),
     category: Optional[str] = None,
     type: Optional[str] = None,
     all_members: bool = Query(False, description="是否获取所有成员的通知"),
@@ -27,6 +29,7 @@ def get_notifications(
     获取通知列表
     - 支持按成员筛选
     - 支持按已读/未读筛选
+    - 支持按已处理/未处理筛选
     - 支持按分类筛选
     - 支持按类型筛选
     - all_members=true 时获取所有成员的通知
@@ -37,6 +40,9 @@ def get_notifications(
     patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
     if not patient:
         raise HTTPException(status_code=404, detail="患者档案不存在")
+    
+    # 自动生成提醒通知并保存到数据库
+    notification_service.generate_all_reminders(db, patient.id)
     
     query = db.query(models.Notification).filter(
         models.Notification.patient_id == patient.id
@@ -58,6 +64,9 @@ def get_notifications(
     if is_read is not None:
         query = query.filter(models.Notification.is_read == is_read)
     
+    if is_handled is not None:
+        query = query.filter(models.Notification.is_handled == is_handled)
+    
     if category:
         query = query.filter(models.Notification.category == category)
     
@@ -67,7 +76,13 @@ def get_notifications(
     total = query.count()
     unread_count = db.query(models.Notification).filter(
         models.Notification.patient_id == patient.id,
-        models.Notification.is_read == False
+        models.Notification.is_read == False,
+        models.Notification.is_handled == False
+    ).count()
+    
+    unhandled_count = db.query(models.Notification).filter(
+        models.Notification.patient_id == patient.id,
+        models.Notification.is_handled == False
     ).count()
     
     items = query.order_by(
@@ -97,6 +112,9 @@ def get_notifications(
             extra_data=item.extra_data,
             is_read=item.is_read,
             read_at=item.read_at,
+            is_handled=item.is_handled,
+            handled_at=item.handled_at,
+            handler_type=item.handler_type,
             created_at=item.created_at,
             member_nickname=member_nickname,
             member_relation=member_relation
@@ -105,7 +123,8 @@ def get_notifications(
     return {
         "items": items_with_member,
         "total": total,
-        "unread_count": unread_count
+        "unread_count": unread_count,
+        "unhandled_count": unhandled_count
     }
 
 @router.post("/", response_model=schemas.NotificationResponse, summary="创建通知")
@@ -290,3 +309,87 @@ def get_unread_count(
     count = query.count()
     
     return {"unread_count": count}
+
+@router.put("/{notification_id}/handle", summary="标记通知为已处理")
+def mark_notification_as_handled(
+    notification_id: int,
+    handler_type: str = Query("user", description="处理方式: user 或 auto"),
+    current_user: models.User = Depends(dependencies.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    标记单条通知为已处理
+    """
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(status_code=403, detail="仅患者可访问")
+    
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="患者档案不存在")
+    
+    notification = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.patient_id == patient.id
+    ).first()
+    
+    if not notification:
+        raise HTTPException(status_code=404, detail="通知不存在")
+    
+    notification.is_handled = True
+    notification.handled_at = datetime.utcnow()
+    notification.handler_type = handler_type
+    
+    db.commit()
+    db.refresh(notification)
+    
+    return {
+        "message": "已标记为处理",
+        "id": notification.id,
+        "is_handled": notification.is_handled,
+        "handled_at": notification.handled_at
+    }
+
+@router.put("/handle-all", summary="批量标记已处理")
+def mark_all_notifications_as_handled(
+    member_id: Optional[UUID4] = None,
+    type: Optional[str] = None,
+    current_user: models.User = Depends(dependencies.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    批量标记通知为已处理
+    - 可按成员筛选
+    - 可按类型筛选
+    """
+    if current_user.role != models.UserRole.patient:
+        raise HTTPException(status_code=403, detail="仅患者可访问")
+    
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="患者档案不存在")
+    
+    query = db.query(models.Notification).filter(
+        models.Notification.patient_id == patient.id,
+        models.Notification.is_handled == False
+    )
+    
+    if member_id:
+        query = query.filter(models.Notification.member_id == member_id)
+    
+    if type:
+        query = query.filter(models.Notification.type == type)
+    
+    count = query.count()
+    
+    query.update({
+        models.Notification.is_handled: True,
+        models.Notification.handled_at: datetime.utcnow(),
+        models.Notification.handler_type: "user"
+    }, synchronize_session=False)
+    
+    db.commit()
+    
+    return {
+        "message": f"已标记 {count} 条通知为已处理",
+        "handled_count": count
+    }

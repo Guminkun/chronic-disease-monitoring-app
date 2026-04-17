@@ -1,5 +1,5 @@
 {
-    "name" : "小二",
+    "name" : "慢小二",
     "appid" : "__UNI__F83535C",
     "description" : "",
     "versionName" : "1.0.0",
@@ -53,8 +53,8 @@
         "appid" : "wxab2e937f7d47f4d9",
         "setting" : {
             "urlCheck" : false,
-            "minified" : false,
-            "postcss" : false,
+            "minified" : true,
+            "postcss" : true,
             "es6" : true,
             "enhance" : true
         },
@@ -67,6 +67,9 @@
             "request" : 30000,
             "downloadFile" : 30000,
             "uploadFile" : 60000
+        },
+        "optimization" : {
+            "subPackages" : true
         }
     },
     "mp-alipay" : {

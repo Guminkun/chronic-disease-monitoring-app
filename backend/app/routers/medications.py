@@ -146,10 +146,13 @@ def create_medication_plan(
     )
     
     if plan.is_temporary:
-        db_plan.duration_days = 1
-        db_plan.end_date = plan.start_date
-        db_plan.frequency_type = "daily"
-        db_plan.frequency_value = "1"
+        if not db_plan.duration_days or db_plan.duration_days < 1:
+            db_plan.duration_days = 1
+        if not db_plan.end_date:
+            db_plan.end_date = plan.start_date
+        if not db_plan.frequency_type:
+            db_plan.frequency_type = "daily"
+            db_plan.frequency_value = "1"
         
     db.add(db_plan)
     db.commit()

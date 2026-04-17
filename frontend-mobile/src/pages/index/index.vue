@@ -419,7 +419,11 @@ const loadNotificationCount = async () => {
 const loadLatestNotifications = async () => {
   if (!userStore.token) { latestNotifications.value = []; return }
   try {
-    const res = await getNotifications({ all_members: true, limit: 5 })
+    const res = await getNotifications({ 
+      all_members: true, 
+      is_handled: false,
+      limit: 5 
+    })
     latestNotifications.value = res.items || []
   } catch { latestNotifications.value = [] }
 }

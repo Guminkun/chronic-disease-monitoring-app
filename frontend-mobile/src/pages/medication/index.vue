@@ -672,13 +672,28 @@ const formatFrequencyDisplay = (plan: any) => {
 
 const remainingDays = (plan: any): number | null => {
   if (plan === null || plan === undefined) return null
-  const end = plan?.end_date
-  if (!end) return null
-  const now = new Date()
-  const endDate = new Date(end)
-  if (Number.isNaN(endDate.getTime())) return null
-  const diff = Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
-  return diff < 0 ? 0 : diff
+  
+  // 临时用药：按照用药周期（开始日期到结束日期）计算
+  if (plan.is_temporary) {
+    const end = plan?.end_date
+    if (!end) return null
+    const now = new Date()
+    const endDate = new Date(end)
+    if (Number.isNaN(endDate.getTime())) return null
+    const diff = Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    return diff < 0 ? 0 : diff
+  }
+  
+  // 长期用药：按照单次剂量和余量计算剩余天数
+  const stock = Number(plan?.stock) || 0
+  const dosageAmount = Number(plan?.dosage_amount) || 0
+  const timesPerDay = (plan?.taken_times || []).length || 1
+  
+  if (stock <= 0 || dosageAmount <= 0) return 0
+  
+  const dailyDose = dosageAmount * timesPerDay
+  const days = Math.floor(stock / dailyDose)
+  return days
 }
 
 const handleEdit = (plan: any) => {
