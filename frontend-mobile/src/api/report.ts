@@ -163,7 +163,7 @@ export const batchDeleteReports = (ids: string[]) => {
     })
 }
 
-export const getTrends = (params?: { report_type?: string, metric_names?: string[], start_date?: string, end_date?: string }) => {
+export const getTrends = (params?: { report_type?: string, metric_names?: string[], start_date?: string, end_date?: string, member_id?: string }) => {
     return request({
         url: '/reports/trends',
         method: 'GET',

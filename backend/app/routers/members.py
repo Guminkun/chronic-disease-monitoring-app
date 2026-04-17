@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from .. import crud, schemas, models, dependencies
 from ..services.minio_service import minio_service
+from ..config import settings
 from uuid import UUID
 from PIL import Image
 import io
@@ -303,7 +304,11 @@ async def upload_avatar(
             "image/jpeg",
             bucket_name="avatars"
         )
-        url = minio_service.get_presigned_url(file_key, bucket_name="avatars")
+        
+        endpoint = settings.MINIO_ENDPOINT
+        if not endpoint.startswith('http'):
+            endpoint = f"http://{endpoint}"
+        url = f"{endpoint}/avatars/{file_key}"
         
         return {"url": url, "filename": file_key}
     except Exception as e:

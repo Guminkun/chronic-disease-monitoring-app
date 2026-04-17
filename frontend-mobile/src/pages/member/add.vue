@@ -9,6 +9,22 @@
           </view>
           
           <view class="avatar-section">
+            <!-- #ifdef MP-WEIXIN -->
+            <button class="avatar-btn-wrapper" open-type="chooseAvatar" @chooseavatar="onChooseAvatar" :key="avatarKey">
+              <image 
+                v-if="formData.avatar_url" 
+                :src="formData.avatar_url + '?t=' + Date.now()" 
+                class="avatar-preview" 
+                mode="aspectFill"
+                :key="formData.avatar_url"
+              />
+              <view v-else class="avatar-placeholder-add">
+                <text class="avatar-add-icon">+</text>
+                <text class="avatar-add-text">添加头像</text>
+              </view>
+            </button>
+            <!-- #endif -->
+            <!-- #ifndef MP-WEIXIN -->
             <view class="avatar-upload" @click="chooseAvatar">
               <image 
                 v-if="formData.avatar_url" 
@@ -21,16 +37,28 @@
                 <text class="avatar-add-text">添加头像</text>
               </view>
             </view>
+            <!-- #endif -->
           </view>
           
           <view class="form-item">
             <text class="label"><text class="required-mark">*</text>昵称</text>
+            <!-- #ifdef MP-WEIXIN -->
+            <input
+              v-model="formData.nickname"
+              type="nickname"
+              class="input"
+              placeholder="点击获取微信昵称"
+              @blur="onNicknameChange"
+            />
+            <!-- #endif -->
+            <!-- #ifndef MP-WEIXIN -->
             <input
               v-model="formData.nickname"
               class="input"
               placeholder="请输入昵称"
               maxlength="20"
             />
+            <!-- #endif -->
           </view>
           
           <view class="form-item">
@@ -231,6 +259,7 @@ const userStore = useUserStore()
 const showExtended = ref(false)
 const isCustomRelation = ref(false)
 const avatarUploading = ref(false)
+const avatarKey = ref(0)
 
 const formData = ref<MemberFormData>({
   nickname: '',
@@ -311,6 +340,33 @@ const chooseAvatar = () => {
       uni.showToast({ title: '取消选择', icon: 'none' })
     }
   })
+}
+
+const onChooseAvatar = async (e: any) => {
+  const avatarUrl = e.detail.avatarUrl
+  if (!avatarUrl) return
+  
+  avatarUploading.value = true
+  uni.showLoading({ title: '上传中...' })
+  
+  try {
+    const result = await uploadAvatar(avatarUrl)
+    formData.value.avatar_url = result.url
+    avatarKey.value++
+    uni.showToast({ title: '头像上传成功', icon: 'success' })
+  } catch (error) {
+    console.error('头像上传失败:', error)
+    uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+  } finally {
+    avatarUploading.value = false
+    uni.hideLoading()
+  }
+}
+
+const onNicknameChange = (e: any) => {
+  if (e.detail.value) {
+    formData.value.nickname = e.detail.value
+  }
 }
 
 const onGenderChange = (e: any) => {
@@ -403,7 +459,7 @@ const handleSave = async () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .add-member-page {
   min-height: 100vh;
   background: #f0f4ff;
@@ -460,6 +516,24 @@ const handleSave = async () => {
   display: flex;
   justify-content: center;
   margin-bottom: 20px;
+}
+
+.avatar-btn-wrapper {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px dashed #7dd3fc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  
+  &::after {
+    border: none;
+  }
 }
 
 .avatar-upload {

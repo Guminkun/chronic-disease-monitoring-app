@@ -535,7 +535,82 @@ const selectMedication = (item: MedicationDictItem) => {
   uni.showToast({ title: '已从药品库回填', icon: 'none' })
 }
 
-const onRemindSwitch = (e: any) => { form.value.remind = e?.detail?.value ? 'on' : 'off' }
+const openid = ref('')
+
+const requestSubscribeMessage = async () => {
+  // #ifdef MP-WEIXIN
+  try {
+    const templateRes: any = await medApi.getSubscribeMessageTemplate()
+    const templateId = templateRes.template_id
+    
+    if (!templateId) {
+      uni.showToast({ title: '订阅消息模板未配置', icon: 'none' })
+      return false
+    }
+    
+    return new Promise((resolve) => {
+      (uni as any).requestSubscribeMessage({
+        tmplIds: [templateId],
+        success: async (res: any) => {
+          if (res[templateId] === 'accept') {
+            try {
+              const loginRes: any = await (uni as any).login()
+              if (loginRes.code) {
+                const confirmData: medApi.ConfirmSubscriptionData = {
+                  template_id: templateId,
+                  code: loginRes.code
+                }
+                await medApi.confirmSubscription(confirmData)
+                uni.showToast({ title: '订阅成功', icon: 'success' })
+                resolve(true)
+              } else {
+                resolve(false)
+              }
+            } catch (e) {
+              console.error('Confirm subscription error:', e)
+              resolve(false)
+            }
+          } else if (res[templateId] === 'reject') {
+            uni.showToast({ title: '您拒绝了订阅', icon: 'none' })
+            resolve(false)
+          } else {
+            uni.showToast({ title: '订阅已取消', icon: 'none' })
+            resolve(false)
+          }
+        },
+        fail: (err: any) => {
+          console.error('Request subscribe message failed:', err)
+          uni.showToast({ title: '订阅失败，请稍后重试', icon: 'none' })
+          resolve(false)
+        }
+      })
+    })
+  } catch (e) {
+    console.error('Get template error:', e)
+    return false
+  }
+  // #endif
+  
+  // #ifndef MP-WEIXIN
+  uni.showToast({ title: '仅支持微信小程序', icon: 'none' })
+  return false
+  // #endif
+}
+
+const onRemindSwitch = async (e: any) => {
+  const newValue = e?.detail?.value ? 'on' : 'off'
+  
+  if (newValue === 'on') {
+    const subscribed = await requestSubscribeMessage()
+    if (subscribed) {
+      form.value.remind = 'on'
+    } else {
+      form.value.remind = 'off'
+    }
+  } else {
+    form.value.remind = 'off'
+  }
+}
 
 
 const times = ref<string[]>(['08:00', '12:00', '18:00'])

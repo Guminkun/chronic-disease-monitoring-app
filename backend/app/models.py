@@ -694,3 +694,25 @@ class UsageGuide(Base):
     views = Column(Integer, default=0)                        # 浏览量
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WechatSubscription(Base):
+    """
+    微信订阅消息授权表
+    记录用户在小程序端授权订阅消息的状态
+    """
+    __tablename__ = "wechat_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    openid = Column(String(100), nullable=False, index=True)
+    template_id = Column(String(100), nullable=False)
+    
+    is_subscribed = Column(Boolean, default=True)
+    subscribe_count = Column(Integer, default=0)
+    used_count = Column(Integer, default=0)
+    
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", backref="wechat_subscriptions")

@@ -7,12 +7,98 @@ import uuid
 
 from .. import models, schemas, crud, dependencies
 from ..database import get_db
+from ..config import settings
+from ..services.wechat_service import wechat_service
 
 router = APIRouter(
     prefix="/medications",
     tags=["medications"],
     responses={404: {"description": "Not found"}},
 )
+
+
+# --- WeChat Subscription Message Endpoints ---
+
+@router.get("/subscribe-message")
+def get_subscribe_message_template(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    template_id = settings.WECHAT_MEDICATION_TEMPLATE_ID
+    
+    if not template_id:
+        return {
+            "template_id": "mock_template_id_for_dev",
+            "template_name": "用药提醒通知（开发模式）",
+            "is_dev_mode": True
+        }
+    
+    return {
+        "template_id": template_id,
+        "template_name": "用药提醒通知"
+    }
+
+
+@router.post("/confirm-subscription")
+async def confirm_subscription(
+    subscription_data: schemas.WechatSubscriptionConfirm,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    openid = await wechat_service.get_openid_by_code(subscription_data.code)
+    if not openid:
+        raise HTTPException(status_code=400, detail="Failed to get openid from WeChat")
+    
+    existing = db.query(models.WechatSubscription).filter(
+        models.WechatSubscription.user_id == current_user.id,
+        models.WechatSubscription.template_id == subscription_data.template_id
+    ).first()
+    
+    if existing:
+        existing.is_subscribed = True
+        existing.subscribe_count += 1
+        existing.updated_at = datetime.now()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        new_subscription = models.WechatSubscription(
+            user_id=current_user.id,
+            openid=openid,
+            template_id=subscription_data.template_id,
+            is_subscribed=True,
+            subscribe_count=1,
+            used_count=0
+        )
+        db.add(new_subscription)
+        db.commit()
+        db.refresh(new_subscription)
+        return new_subscription
+
+
+@router.get("/subscription-status")
+def get_subscription_status(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    template_id = settings.WECHAT_MEDICATION_TEMPLATE_ID
+    
+    subscription = db.query(models.WechatSubscription).filter(
+        models.WechatSubscription.user_id == current_user.id,
+        models.WechatSubscription.template_id == template_id
+    ).first()
+    
+    if not subscription:
+        return {
+            "is_subscribed": False,
+            "remaining_count": 0
+        }
+    
+    remaining = subscription.subscribe_count - subscription.used_count
+    return {
+        "is_subscribed": subscription.is_subscribed and remaining > 0,
+        "remaining_count": max(0, remaining)
+    }
 
 # 1. 创建用药计划
 @router.post("/", response_model=schemas.MedicationPlanResponse)

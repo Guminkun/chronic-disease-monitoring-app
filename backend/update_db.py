@@ -436,5 +436,42 @@ def update_db():
         except Exception as e:
             print(f"Error adding avatar_url to members: {e}")
 
+        # ========== 创建微信订阅消息授权表 ==========
+        table_names = inspector.get_table_names()
+        if "wechat_subscriptions" not in table_names:
+            try:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS wechat_subscriptions (
+                            id SERIAL PRIMARY KEY,
+                            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            openid VARCHAR(100) NOT NULL,
+                            template_id VARCHAR(100) NOT NULL,
+                            is_subscribed BOOLEAN DEFAULT TRUE,
+                            subscribe_count INTEGER DEFAULT 0,
+                            used_count INTEGER DEFAULT 0,
+                            last_used_at TIMESTAMP WITH TIME ZONE,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+                conn.commit()
+                print("Created wechat_subscriptions table")
+            except Exception as e:
+                print(f"Error creating wechat_subscriptions table: {e}")
+        
+        # 为 wechat_subscriptions 表创建索引
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wechat_sub_user_id ON wechat_subscriptions (user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wechat_sub_openid ON wechat_subscriptions (openid)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wechat_sub_template_id ON wechat_subscriptions (template_id)"))
+            conn.commit()
+            print("Created wechat_subscriptions indexes")
+        except Exception as e:
+            print(f"Error creating wechat_subscriptions indexes: {e}")
+
 if __name__ == "__main__":
     update_db()

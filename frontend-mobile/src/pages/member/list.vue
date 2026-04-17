@@ -9,6 +9,16 @@
           :class="{ 'is-current': member.is_current }"
           @click="handleMemberClick(member)"
         >
+          <image 
+            v-if="member.avatar_url" 
+            :src="member.avatar_url" 
+            class="member-avatar"
+            mode="aspectFill"
+          />
+          <view v-else class="member-avatar-placeholder">
+            <text>{{ member.nickname.charAt(0) }}</text>
+          </view>
+          
           <view class="member-info">
             <text class="member-nickname">{{ member.nickname }}</text>
             <text class="member-relation">{{ member.relation }}</text>
@@ -142,6 +152,32 @@ const handleAddMember = () => {
 .member-item.is-current {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   border: 2px solid #3b82f6;
+}
+
+.member-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.member-avatar-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.member-avatar-placeholder text {
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .member-info {

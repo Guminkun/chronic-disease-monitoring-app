@@ -12,12 +12,58 @@
 
     <!-- 主标题区域 -->
     <view class="header-section">
-      <text class="main-title">{{ loginType === 'password' ? '密码登录' : '手机号登录' }}</text>
-      <text class="sub-title">未注册的手机号登录成功后将自动注册</text>
+      <text class="main-title">欢迎使用</text>
+      <text class="app-name">慢病管理系统</text>
     </view>
 
-    <!-- 表单区域 -->
-    <view class="form-section">
+    <!-- 微信一键登录 -->
+    <view class="wechat-login-section">
+      <view 
+        class="wechat-login-btn"
+        :class="{ 'btn-loading': loading }"
+        @click="handleWechatLogin"
+      >
+        <view class="wechat-icon">
+          <view class="icon-wechat-css">
+            <view class="bubble-large">
+              <view class="eyes"></view>
+            </view>
+            <view class="bubble-small">
+              <view class="eyes"></view>
+            </view>
+          </view>
+        </view>
+        <text class="wechat-text">{{ loading ? '登录中...' : '微信一键登录' }}</text>
+      </view>
+    </view>
+
+    <!-- 分隔线 -->
+    <view class="divider-section">
+      <view class="divider-line"></view>
+      <text class="divider-text">其他登录方式</text>
+      <view class="divider-line"></view>
+    </view>
+
+    <!-- 其他登录方式 -->
+    <view class="other-login-section">
+      <!-- 手机号/密码登录切换 -->
+      <view class="login-tabs">
+        <view 
+          class="tab-item" 
+          :class="{ active: loginType === 'password' }"
+          @click="loginType = 'password'"
+        >
+          <text>密码登录</text>
+        </view>
+        <view 
+          class="tab-item" 
+          :class="{ active: loginType === 'sms' }"
+          @click="loginType = 'sms'"
+        >
+          <text>验证码登录</text>
+        </view>
+      </view>
+
       <!-- 手机号输入 -->
       <view class="input-wrapper">
         <view class="phone-prefix" @click="showAreaCodePicker">
@@ -49,91 +95,96 @@
         </view>
       </view>
 
+      <!-- 验证码输入 -->
+      <view v-if="loginType === 'sms'" class="input-wrapper">
+        <input 
+          class="main-input"
+          type="number"
+          maxlength="6"
+          v-model="smsCode"
+          placeholder="输入验证码"
+          placeholder-style="color: #C0C4CC"
+        />
+        <view class="sms-btn" :class="{ disabled: smsCountdown > 0 }" @click="sendSmsCode">
+          <text>{{ smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码' }}</text>
+        </view>
+      </view>
+
       <!-- 登录按钮 -->
       <view 
         class="login-btn" 
         :class="{ 'btn-disabled': !canSubmit }"
         @click="handleLogin"
       >
-        <text class="login-btn-text">{{ loginType === 'password' ? '登录' : '验证并登录' }}</text>
-      </view>
-
-      <!-- 协议勾选 -->
-      <view class="agreement-section">
-        <view class="checkbox-wrapper" @click="agreeProtocol = !agreeProtocol">
-          <view class="checkbox" :class="{ checked: agreeProtocol }">
-            <text v-if="agreeProtocol" class="check-mark">✓</text>
-          </view>
-        </view>
-        <view class="agreement-text">
-          已阅读并同意<text class="link-text">服务协议</text>和<text class="link-text">隐私保护指引</text>
-        </view>
+        <text class="login-btn-text">登录</text>
       </view>
     </view>
 
-    <!-- 底部快捷登录 -->
-    <view class="quick-login-section">
-      <!-- 微信登录 -->
-      <view class="quick-login-item" @click="handleWechatLogin">
-        <view class="icon-circle wechat-bg">
-          <view class="icon-wechat-css">
-            <view class="bubble-large">
-              <view class="eyes"></view>
-            </view>
-            <view class="bubble-small">
-              <view class="eyes"></view>
-            </view>
-          </view>
+    <!-- 协议勾选 -->
+    <view class="agreement-section">
+      <view class="checkbox-wrapper" @click="agreeProtocol = !agreeProtocol">
+        <view class="checkbox" :class="{ checked: agreeProtocol }">
+          <text v-if="agreeProtocol" class="check-mark">✓</text>
         </view>
-        <text class="item-label">微信登录</text>
       </view>
-      
-      <!-- 手机号登录 -->
-      <view class="quick-login-item" @click="loginType = 'sms'">
-        <view class="icon-circle" :class="loginType === 'sms' ? 'blue-bg' : 'gray-bg'">
-          <view class="icon-phone-css" :class="{ 'active': loginType === 'sms' }"></view>
-        </view>
-        <text class="item-label">手机号登录</text>
+      <view class="agreement-text">
+        已阅读并同意<text class="link-text">服务协议</text>和<text class="link-text">隐私保护指引</text>
       </view>
+    </view>
 
-      <!-- 密码登录 -->
-      <view class="quick-login-item" @click="loginType = 'password'">
-        <view class="icon-circle" :class="loginType === 'password' ? 'blue-bg' : 'gray-bg'">
-          <view class="icon-lock-css" :class="{ 'active': loginType === 'password' }"></view>
-        </view>
-        <text class="item-label">密码登录</text>
-      </view>
-
-      <!-- 注册 -->
-      <view class="quick-login-item" @click="goRegister">
-        <view class="icon-circle gray-bg">
-          <view class="icon-register-css"></view>
-        </view>
-        <text class="item-label">注册</text>
-      </view>
+    <!-- 底部注册入口 -->
+    <view class="register-section">
+      <text class="register-text">还没有账号？</text>
+      <text class="register-link" @click="goRegister">立即注册</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { navigateAfterLogin } from '@/utils/auth'
+import { sendSmsCode as sendSmsCodeApi } from '@/api/auth'
 
 const userStore = useUserStore()
 const loginType = ref<'sms' | 'password'>('password')
 const phone = ref('')
 const password = ref('')
+const smsCode = ref('')
 const showPassword = ref(false)
-const agreeProtocol = ref(false)
+const agreeProtocol = ref(true)
 const loading = ref(false)
+const smsCountdown = ref(0)
 
 const canSubmit = computed(() => {
   if (loginType.value === 'password') {
     return phone.value.length === 11 && password.value.length > 0 && agreeProtocol.value
   }
-  return phone.value.length === 11 && agreeProtocol.value
+  return phone.value.length === 11 && smsCode.value.length >= 4 && agreeProtocol.value
 })
+
+onMounted(() => {
+  // #ifdef MP-WEIXIN
+  // 在微信小程序环境下，自动尝试微信登录
+  autoWechatLogin()
+  // #endif
+})
+
+const autoWechatLogin = async () => {
+  const token = uni.getStorageSync('token')
+  if (token) return
+  
+  loading.value = true
+  try {
+    await userStore.loginByWechat()
+    uni.showToast({ title: '登录成功', icon: 'success' })
+    setTimeout(() => navigateAfterLogin(), 800)
+  } catch (e: any) {
+    console.log('Auto wechat login failed:', e)
+  } finally {
+    loading.value = false
+  }
+}
 
 const goBack = () => {
   uni.navigateBack({ delta: 1 })
@@ -145,6 +196,28 @@ const showAreaCodePicker = () => {
 
 const goRegister = () => {
   uni.navigateTo({ url: '/pages/register/patient-register' })
+}
+
+const sendSmsCode = async () => {
+  if (smsCountdown.value > 0) return
+  if (phone.value.length !== 11) {
+    uni.showToast({ title: '请输入正确的手机号', icon: 'none' })
+    return
+  }
+  
+  try {
+    await sendSmsCodeApi({ phone: phone.value })
+    uni.showToast({ title: '验证码已发送', icon: 'success' })
+    smsCountdown.value = 60
+    const timer = setInterval(() => {
+      smsCountdown.value--
+      if (smsCountdown.value <= 0) {
+        clearInterval(timer)
+      }
+    }, 1000)
+  } catch (e: any) {
+    uni.showToast({ title: e.detail || '发送失败', icon: 'none' })
+  }
 }
 
 const handleLogin = async () => {
@@ -160,9 +233,7 @@ const handleLogin = async () => {
     if (loginType.value === 'password') {
       await userStore.login({ username: phone.value, password: password.value })
     } else {
-      // 验证码登录逻辑（当前后端未支持，暂留空或提示）
-      uni.showToast({ title: '验证码登录功能开发中', icon: 'none' })
-      return
+      await userStore.loginBySms({ phone: phone.value, code: smsCode.value })
     }
     
     uni.showToast({ title: '登录成功', icon: 'success' })
@@ -196,7 +267,7 @@ const handleWechatLogin = async () => {
 <style lang="scss" scoped>
 .login-page {
   min-height: 100vh;
-  background-color: var(--color-bg-base);
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
   padding: 40rpx 60rpx;
   display: flex;
   flex-direction: column;
@@ -221,42 +292,122 @@ const handleWechatLogin = async () => {
 
 .header-section {
   margin-top: 100rpx;
+  text-align: center;
   
   .main-title {
-    font-size: 56rpx;
-    font-weight: bold;
+    font-size: 48rpx;
+    font-weight: 600;
     color: #1a1a1a;
     display: block;
   }
   
-  .sub-title {
-    font-size: 28rpx;
-    color: #C0C4CC;
+  .app-name {
+    font-size: 56rpx;
+    font-weight: bold;
+    color: #07C160;
     margin-top: 20rpx;
     display: block;
   }
 }
 
-.form-section {
-  margin-top: 80rpx;
-  flex: 1;
+.wechat-login-section {
+  margin-top: 100rpx;
+  
+  .wechat-login-btn {
+    background: linear-gradient(135deg, #07C160 0%, #06AD56 100%);
+    height: 100rpx;
+    border-radius: 50rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.3);
+    
+    &.btn-loading {
+      opacity: 0.7;
+    }
+    
+    .wechat-icon {
+      margin-right: 20rpx;
+    }
+    
+    .wechat-text {
+      color: #FFFFFF;
+      font-size: 34rpx;
+      font-weight: 600;
+    }
+  }
+}
+
+.divider-section {
+  display: flex;
+  align-items: center;
+  margin: 60rpx 0 40rpx;
+  
+  .divider-line {
+    flex: 1;
+    height: 1rpx;
+    background-color: #E4E7ED;
+  }
+  
+  .divider-text {
+    font-size: 24rpx;
+    color: #909399;
+    padding: 0 20rpx;
+  }
+}
+
+.other-login-section {
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 40rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
+.login-tabs {
+  display: flex;
+  margin-bottom: 40rpx;
+  border-bottom: 1rpx solid #EBEEF5;
+  
+  .tab-item {
+    flex: 1;
+    text-align: center;
+    padding: 20rpx 0;
+    font-size: 28rpx;
+    color: #909399;
+    position: relative;
+    
+    &.active {
+      color: #07C160;
+      font-weight: 600;
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -1rpx;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60rpx;
+        height: 4rpx;
+        background-color: #07C160;
+        border-radius: 2rpx;
+      }
+    }
+  }
 }
 
 .input-wrapper {
-  background-color: #FFFFFF;
-  border-radius: 24rpx;
-  height: 110rpx;
+  background-color: #F5F7FA;
+  border-radius: 16rpx;
+  height: 100rpx;
   display: flex;
   align-items: center;
   padding: 0 30rpx;
-  margin-bottom: 30rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.08), 0 0 0 1rpx rgba(0, 0, 0, 0.06);
-  border: 1rpx solid rgba(120, 130, 150, 0.15);
-  transition: all 0.3s ease;
+  margin-bottom: 24rpx;
+  border: 1rpx solid transparent;
   
   &:focus-within {
-    box-shadow: 0 6rpx 20rpx rgba(59, 130, 246, 0.12), 0 0 0 2rpx rgba(59, 130, 246, 0.2);
-    border-color: var(--color-primary);
+    background-color: #FFFFFF;
+    border-color: #07C160;
   }
   
   .phone-prefix {
@@ -265,7 +416,7 @@ const handleWechatLogin = async () => {
     padding-right: 20rpx;
     
     .prefix-text {
-      font-size: 32rpx;
+      font-size: 30rpx;
       color: #303133;
       font-weight: 500;
     }
@@ -278,15 +429,15 @@ const handleWechatLogin = async () => {
   }
   
   .vertical-line {
-    width: 2rpx;
+    width: 1rpx;
     height: 40rpx;
-    background-color: #EBEEF5;
+    background-color: #DCDFE6;
     margin: 0 20rpx;
   }
   
   .main-input {
     flex: 1;
-    font-size: 32rpx;
+    font-size: 30rpx;
     color: #303133;
   }
   
@@ -297,26 +448,43 @@ const handleWechatLogin = async () => {
       color: #C0C4CC;
     }
   }
+  
+  .sms-btn {
+    padding: 10rpx 20rpx;
+    background-color: #07C160;
+    border-radius: 8rpx;
+    
+    &.disabled {
+      background-color: #E4E7ED;
+    }
+    
+    text {
+      font-size: 24rpx;
+      color: #FFFFFF;
+    }
+  }
 }
 
 .login-btn {
-  background-color: #6EBFF7;
+  background: linear-gradient(135deg, #409EFF 0%, #3A8EE6 100%);
   height: 100rpx;
-  border-radius: 20rpx;
+  border-radius: 50rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 60rpx;
-  box-shadow: 0 8rpx 20rpx rgba(110, 191, 247, 0.3);
+  margin-top: 40rpx;
+  box-shadow: 0 8rpx 20rpx rgba(64, 158, 255, 0.3);
   
   &.btn-disabled {
     opacity: 0.6;
+    background: #C0C4CC;
+    box-shadow: none;
   }
   
   .login-btn-text {
     color: #FFFFFF;
     font-size: 32rpx;
-    font-weight: 500;
+    font-weight: 600;
   }
 }
 
@@ -324,10 +492,11 @@ const handleWechatLogin = async () => {
   margin-top: 40rpx;
   display: flex;
   align-items: flex-start;
+  justify-content: center;
   
   .checkbox-wrapper {
     padding-top: 4rpx;
-    margin-right: 16rpx;
+    margin-right: 12rpx;
   }
   
   .checkbox {
@@ -340,8 +509,8 @@ const handleWechatLogin = async () => {
     justify-content: center;
     
     &.checked {
-      background-color: #6EBFF7;
-      border-color: #6EBFF7;
+      background-color: #07C160;
+      border-color: #07C160;
     }
     
     .check-mark {
@@ -356,179 +525,72 @@ const handleWechatLogin = async () => {
     line-height: 1.4;
     
     .link-text {
-      color: #6EBFF7;
+      color: #07C160;
     }
   }
 }
 
-.quick-login-section {
-  display: flex;
-  justify-content: space-around;
-  padding-bottom: 120rpx;
+.register-section {
   margin-top: 40rpx;
+  text-align: center;
   
-  .quick-login-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    
-    .icon-circle {
-      width: 84rpx;
-      height: 84rpx;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12rpx;
-      background-color: #FFFFFF;
-      box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
-      
-      &.blue-bg {
-        background-color: #F0F7FF;
-        border: 2rpx solid #D1E9FF;
-      }
-      
-      &.gray-bg {
-        color: #606266;
-        background-color: #F5F7FA;
-        border: 2rpx solid #EBEEF5;
-      }
-    }
-    
-    .item-label {
-      font-size: 22rpx;
-      color: #909399;
-    }
+  .register-text {
+    font-size: 26rpx;
+    color: #909399;
+  }
+  
+  .register-link {
+    font-size: 26rpx;
+    color: #07C160;
+    font-weight: 500;
+  }
+}
 
-    /* CSS Icons */
-    .icon-wechat-css {
-      width: 42rpx;
-      height: 36rpx;
-      position: relative;
-      
-      .bubble-large {
-        width: 30rpx;
-        height: 25rpx;
-        background-color: #07C160;
-        border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        
-        .eyes {
-          width: 3rpx;
-          height: 3rpx;
-          background-color: #FFF;
-          border-radius: 50%;
-          position: absolute;
-          top: 8rpx;
-          left: 6rpx;
-          box-shadow: 14rpx 0 #FFF;
-        }
-      }
-      
-      .bubble-small {
-        width: 24rpx;
-        height: 20rpx;
-        background-color: #07C160;
-        border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        border: 1.5rpx solid #FFF;
-        
-        .eyes {
-          width: 2.5rpx;
-          height: 2.5rpx;
-          background-color: #FFF;
-          border-radius: 50%;
-          position: absolute;
-          top: 7rpx;
-          left: 5rpx;
-          box-shadow: 10rpx 0 #FFF;
-        }
-      }
-    }
+/* CSS Icons */
+.icon-wechat-css {
+  width: 48rpx;
+  height: 40rpx;
+  position: relative;
+  
+  .bubble-large {
+    width: 34rpx;
+    height: 28rpx;
+    background-color: #FFFFFF;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    position: absolute;
+    top: 0;
+    left: 0;
     
-    .icon-phone-css {
-      width: 24rpx;
-      height: 40rpx;
-      border: 3rpx solid #606266;
-      border-radius: 5rpx;
-      position: relative;
-      
-      &.active {
-        border-color: #1890FF;
-        &::after { background-color: #1890FF; }
-      }
-      
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: 5rpx;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 10rpx;
-        height: 2rpx;
-        background-color: #606266;
-        border-radius: 2rpx;
-      }
+    .eyes {
+      width: 4rpx;
+      height: 4rpx;
+      background-color: #07C160;
+      border-radius: 50%;
+      position: absolute;
+      top: 10rpx;
+      left: 8rpx;
+      box-shadow: 16rpx 0 #07C160;
     }
+  }
+  
+  .bubble-small {
+    width: 28rpx;
+    height: 22rpx;
+    background-color: #FFFFFF;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    position: absolute;
+    bottom: 0;
+    right: 0;
     
-    .icon-lock-css {
-      width: 28rpx;
-      height: 24rpx;
-      background-color: #606266;
-      border-radius: 4rpx;
-      position: relative;
-      margin-top: 12rpx;
-      
-      &.active {
-        background-color: #1890FF;
-        &::before { border-color: #1890FF; }
-      }
-      
-      &::before {
-        content: '';
-        position: absolute;
-        top: -14rpx;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 18rpx;
-        height: 16rpx;
-        border: 3rpx solid #606266;
-        border-bottom: none;
-        border-radius: 10rpx 10rpx 0 0;
-      }
-    }
-    
-    .icon-register-css {
-      width: 30rpx;
-      height: 30rpx;
-      position: relative;
-      
-      &::before, &::after {
-        content: '';
-        position: absolute;
-        background-color: #606266;
-        border-radius: 2rpx;
-      }
-      
-      &::before {
-        width: 100%;
-        height: 3rpx;
-        top: 50%;
-        left: 0;
-        transform: translateY(-50%);
-      }
-      
-      &::after {
-        width: 3rpx;
-        height: 100%;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-      }
+    .eyes {
+      width: 3rpx;
+      height: 3rpx;
+      background-color: #07C160;
+      border-radius: 50%;
+      position: absolute;
+      top: 8rpx;
+      left: 6rpx;
+      box-shadow: 12rpx 0 #07C160;
     }
   }
 }

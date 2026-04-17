@@ -10,8 +10,8 @@
       <view class="filter-item">
         <view class="filter-label">报告类型</view>
         <picker 
-          :range="reportTypes" 
-          range-key="name"
+          mode="selector"
+          :range="REPORT_SUBCATEGORIES"
           :value="reportTypeIndex" 
           @change="handleReportTypeChange"
         >
@@ -25,6 +25,7 @@
       <view class="filter-item">
         <view class="filter-label">当前指标</view>
         <picker 
+          mode="selector"
           v-if="metricNames.length > 0" 
           :range="metricNames" 
           :value="metricIndex" 
@@ -53,9 +54,12 @@
         <button class="upload-btn" @click="goToUpload">上传新报告</button>
       </view>
       
-      <!-- 始终挂载 EchartsComp，避免 v-show 隐藏时 canvas 尺寸为 0 -->
-      <view class="echarts-dom" :style="{ display: hasEnoughData ? 'block' : 'none' }">
-        <EchartsComp canvas-id="trend-chart" @init="onChartInit" />
+      <view v-else class="chart-wrapper">
+        <TrendChart 
+          :title="selectedMetricName + ' 趋势'"
+          :data="chartData"
+          :unit="currentUnit"
+        />
       </view>
     </view>
     
@@ -80,22 +84,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { getTrends } from '@/api/report'
-import { getReportTypes } from '@/api/report_type'
-import * as echarts from 'echarts'
-import EchartsComp from '@/components/EchartsComp.vue'
+import { useMemberStore } from '@/stores/member'
+import TrendChart from '@/components/TrendChart.vue'
+
+const memberStore = useMemberStore()
 
 const loading = ref(false)
 const allTrends = ref<any[]>([])
 const metricIndex = ref(0)
-const chartInstance = ref<any>(null)
 
-// Report Types
-const reportTypes = ref<any[]>([{ id: -1, name: '全部类型' }])
+const REPORT_SUBCATEGORIES = [
+  '全部类型',
+  '血常规', '尿常规', '肝功能', '肾功能', '血糖检测', '血脂检测',
+  '电解质', '甲状腺功能', '凝血功能', '心肌酶谱', '肿瘤标志物', '乙肝五项',
+  'CT检查', 'MRI检查', 'X线检查', '超声检查', '心电图', '胃镜检查', '肠镜检查'
+]
+
 const reportTypeIndex = ref(0)
 
-// Computed properties
 const metricNames = computed(() => allTrends.value.map(t => t.metric_name))
 const selectedMetric = computed(() => allTrends.value[metricIndex.value] || null)
 const selectedMetricName = computed(() => selectedMetric.value?.metric_name || '')
@@ -104,66 +113,36 @@ const currentUnit = computed(() => selectedMetric.value?.unit || '')
 const hasEnoughData = computed(() => currentPoints.value.length >= 2)
 
 const selectedReportTypeName = computed(() => {
-  const type = reportTypes.value[reportTypeIndex.value]
-  return type ? type.name : '全部类型'
+  return REPORT_SUBCATEGORIES[reportTypeIndex.value] || '全部类型'
 })
 
-// Lifecycle
-onMounted(async () => {
-  await fetchReportTypes()
+const chartData = computed(() => {
+  return currentPoints.value.map((p: any) => ({
+    date: typeof p.date === 'string' ? p.date : String(p.date),
+    value: p.value
+  }))
+})
+
+onMounted(() => {})
+
+onShow(async () => {
   await fetchData()
 })
-
-const onChartInit = (chart: any) => {
-  chartInstance.value = chart
-  tryRender()
-}
-
-// 数据和图表实例都就绪后才渲染
-const tryRender = () => {
-  if (!chartInstance.value || !hasEnoughData.value) return
-  renderChart()
-}
-
-onUnmounted(() => {
-  chartInstance.value?.dispose()
-})
-
-// Methods
-const fetchReportTypes = async () => {
-  try {
-    const res = await getReportTypes({})
-    if (Array.isArray(res)) {
-      // Filter distinct categories/names or just use raw list
-      // For simplicity, we just use the names returned. 
-      // Ideally backend should return distinct types used by this user, but here we list all available types
-      reportTypes.value = [{ id: -1, name: '全部类型' }, ...res]
-    }
-  } catch (error) {
-    console.error('Failed to fetch report types:', error)
-  }
-}
 
 const fetchData = async () => {
   try {
     loading.value = true
-    const type = reportTypes.value[reportTypeIndex.value]
-    const typeParam = (type && type.id !== -1) ? type.name : undefined
+    const typeName = REPORT_SUBCATEGORIES[reportTypeIndex.value]
+    const typeParam = typeName === '全部类型' ? undefined : typeName
     
-    const res = await getTrends({ report_type: typeParam })
-    // res should be an array of MetricTrendResponse
+    const memberId = memberStore.currentMember?.id
+    const res = await getTrends({ 
+      report_type: typeParam,
+      member_id: memberId
+    })
     if (Array.isArray(res)) {
       allTrends.value = res
-      // Select first metric by default if available
       metricIndex.value = 0
-      if (allTrends.value.length > 0) {
-        initChart()
-      } else {
-        // Clear chart if no data
-        if (chartInstance.value) {
-          chartInstance.value.clear()
-        }
-      }
     }
   } catch (error) {
     console.error('Failed to fetch trends:', error)
@@ -174,84 +153,14 @@ const fetchData = async () => {
 }
 
 const handleReportTypeChange = (e: any) => {
-  reportTypeIndex.value = e.detail.value
+  const value = Number(e.detail.value)
+  reportTypeIndex.value = isNaN(value) ? 0 : value
   fetchData()
 }
 
 const handleMetricChange = (e: any) => {
-  metricIndex.value = e.detail.value
-  initChart()
-}
-
-const initChart = () => {
-  tryRender()
-}
-
-const renderChart = () => {
-
-  const dates = currentPoints.value.map((p: any) => p.date)
-  const values = currentPoints.value.map((p: any) => p.value)
-  
-  const option = {
-    title: {
-      text: `${selectedMetricName.value} 趋势`,
-      left: 'center',
-      textStyle: { fontSize: 16 }
-    },
-    tooltip: {
-      trigger: 'axis'
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: dates,
-      axisLabel: {
-        rotate: 45,
-        formatter: (value: string) => {
-            return value.substring(5) // MM-DD
-        }
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: currentUnit.value
-    },
-    series: [
-      {
-        name: selectedMetricName.value,
-        type: 'line',
-        data: values,
-        smooth: true,
-        markPoint: {
-          data: [
-            { type: 'max', name: 'Max' },
-            { type: 'min', name: 'Min' }
-          ]
-        },
-        lineStyle: {
-          color: '#3b82f6',
-          width: 3
-        },
-        itemStyle: {
-          color: '#3b82f6'
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
-            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
-          ])
-        }
-      }
-    ]
-  }
-  
-  chartInstance.value.setOption(option)
+  const value = Number(e.detail.value)
+  metricIndex.value = isNaN(value) ? 0 : value
 }
 
 const goToUpload = () => {
@@ -266,37 +175,41 @@ const formatDate = (dateStr: string) => {
 <style lang="scss" scoped>
 .container {
   min-height: 100vh;
-  background-color: #f5f7fa;
-  padding: 20px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding: 0 4px;
   .title {
-    font-size: 24px;
-    font-weight: bold;
+    font-size: 26px;
+    font-weight: 700;
     color: #1e293b;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
   }
   .subtitle {
     font-size: 14px;
     color: #64748b;
+    font-weight: 400;
   }
 }
 
 .filter-card {
   background: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   display: flex;
-  gap: 12px;
+  gap: 16px;
   
   .filter-item {
     flex: 1;
-    min-width: 0; // Prevent flex item overflow
+    min-width: 0;
   }
   
   .filter-label {
@@ -338,18 +251,22 @@ const formatDate = (dateStr: string) => {
 
 .chart-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  min-height: 300px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
   
-  .echarts-dom {
+  .chart-wrapper {
     width: 100%;
-    height: 300px;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
   }
   
   .loading-container, .empty-container {
@@ -363,24 +280,28 @@ const formatDate = (dateStr: string) => {
     .empty-text {
       font-size: 16px;
       margin-bottom: 8px;
+      font-weight: 500;
     }
     
     .empty-subtext {
-      font-size: 12px;
+      font-size: 13px;
       margin-bottom: 16px;
+      color: #94a3b8;
     }
     
     .upload-btn {
       font-size: 14px;
-      background-color: #3b82f6;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
       color: white;
-      border-radius: 20px;
-      padding: 0 20px;
-      line-height: 36px;
+      border-radius: 24px;
+      padding: 0 24px;
+      line-height: 40px;
       border: none;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
       
       &:active {
-        background-color: #2563eb;
+        transform: scale(0.98);
       }
     }
   }
@@ -388,19 +309,21 @@ const formatDate = (dateStr: string) => {
 
 .list-card {
   background: white;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   
   .list-header {
     display: flex;
     justify-content: space-between;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f1f5f9;
     margin-bottom: 12px;
-    font-size: 14px;
+    font-size: 13px;
     color: #64748b;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     
     .col-date,
     .col-value,
@@ -414,8 +337,9 @@ const formatDate = (dateStr: string) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 0;
+    padding: 14px 0;
     border-bottom: 1px solid #f8fafc;
+    transition: background 0.2s;
     
     &:last-child {
       border-bottom: none;
@@ -424,15 +348,16 @@ const formatDate = (dateStr: string) => {
     .col-date {
       flex: 1;
       text-align: center;
-      color: #334155;
+      color: #475569;
       font-size: 14px;
+      font-weight: 500;
     }
     
     .col-value {
       flex: 1;
       text-align: center;
-      color: #0f172a;
-      font-size: 16px;
+      color: #1e293b;
+      font-size: 15px;
       font-weight: 600;
     }
     
@@ -440,20 +365,24 @@ const formatDate = (dateStr: string) => {
       flex: 1;
       display: flex;
       justify-content: center;
-      
-      .status-tag {
-        font-size: 12px;
-        padding: 2px 8px;
-        border-radius: 10px;
-        background-color: #ecfdf5;
-        color: #059669;
-        
-        &.abnormal {
-          background-color: #fef2f2;
-          color: #dc2626;
-        }
-      }
     }
+  }
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #ecfdf5;
+  color: #059669;
+  
+  &.abnormal {
+    background: #fef2f2;
+    color: #dc2626;
   }
 }
 </style>

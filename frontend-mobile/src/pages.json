@@ -94,6 +94,13 @@
 			}
 		},
 		{
+			"path": "pages/profile/edit",
+			"style": {
+				"navigationBarTitleText": "修改个人信息",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
 			"path": "pages/doctor/home",
 			"style": {
 				"navigationBarTitleText": "医生工作台",

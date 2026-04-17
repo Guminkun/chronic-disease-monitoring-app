@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from .routers import auth, patients, doctors, common, chat, indicators, report_types, hospitals, diseases, reports, medications, education, medications_dict, dashboard, imaging_checks, feedback, usage_guides, members, notifications, files
+from .routers import auth, patients, doctors, common, chat, indicators, report_types, hospitals, diseases, reports, medications, education, medications_dict, dashboard, imaging_checks, feedback, usage_guides, members, notifications, files, upload
 import time
 import json
 
@@ -86,6 +86,7 @@ app.include_router(usage_guides.router)
 app.include_router(members.router)
 app.include_router(notifications.router)
 app.include_router(files.router)
+app.include_router(upload.router)
 
 
 @app.get("/")

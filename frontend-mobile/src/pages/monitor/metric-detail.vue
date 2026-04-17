@@ -37,8 +37,12 @@
           <text class="chart-empty-title">数据不足</text>
           <text class="chart-empty-sub">{{ chartEmptyHint }}</text>
         </view>
-        <view v-show="chartHasEnough" class="echarts-dom">
-          <EchartsComp :canvas-id="chartCanvasId" @init="onChartInit" />
+        <view v-else class="chart-wrapper">
+          <TrendChart 
+            :title="meta.label + ' 趋势'"
+            :data="chartData"
+            :unit="meta.unit"
+          />
         </view>
       </view>
 
@@ -243,8 +247,7 @@ const goBack = () => {
 
 import { computed, ref, watch, nextTick } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import * as echarts from 'echarts'
-import EchartsComp from '@/components/EchartsComp.vue'
+import TrendChart from '@/components/TrendChart.vue'
 import { getHealthReadings, addHealthReading, type HealthReadingData } from '@/api/patient'
 import {
   useMeasurementReminders,
@@ -348,10 +351,7 @@ const meta = computed(() => METRICS[(metricType.value || 'blood_sugar') as Metri
 
 const loading = ref(true)
 const readings = ref<Reading[]>([])
-const chartInstance = ref<any>(null)
 const submitting = ref(false)
-
-const chartCanvasId = 'metric-trend-canvas'
 
 const formVisible = ref(false)
 const formSys = ref('')
@@ -378,6 +378,17 @@ const chartSource = computed(() => {
 })
 
 const chartHasEnough = computed(() => chartSource.value.length >= 2)
+
+const chartData = computed(() => {
+  return chartSource.value.map(r => {
+    const date = new Date(r.recorded_at)
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    return {
+      date: dateStr,
+      value: r.value_1
+    }
+  })
+})
 
 const chartEmptyHint = computed(() =>
   meta.value.dualLine
@@ -516,7 +527,6 @@ async function loadData() {
     uni.showToast({ title: '获取数据失败', icon: 'none' })
   } finally {
     loading.value = false
-    nextTick(() => tryRenderChart())
   }
 }
 
@@ -525,179 +535,6 @@ onShow(() => {
   loadData()
   loadReminders()
 })
-
-function onChartInit(chart: any) {
-  chartInstance.value = chart
-  tryRenderChart()
-}
-
-function tryRenderChart() {
-  const chart = chartInstance.value
-  if (!chart || !chartHasEnough.value) return
-
-  const pts = chartSource.value
-  const times = pts.map((r) => new Date(r.recorded_at).getTime())
-
-  if (meta.value.dualLine) {
-    const sys = pts.map((r) => r.value_1)
-    const dia = pts.map((r) => Number(r.value_2))
-    const minV = Math.min(...dia, ...sys)
-    const maxV = Math.max(...dia, ...sys)
-    const pad = Math.max(8, Math.round((maxV - minV) * 0.15))
-    const yMin = Math.max(40, Math.floor(minV - pad))
-    const yMax = Math.min(200, Math.ceil(maxV + pad))
-    const sysData = times.map((t, i) => [t, sys[i]] as [number, number])
-    const diaData = times.map((t, i) => [t, dia[i]] as [number, number])
-
-    chart.setOption(
-      {
-        color: [meta.value.accentColor, meta.value.chartLine2],
-        tooltip: {
-          trigger: 'axis',
-          confine: true,
-          formatter(params: any) {
-            if (!Array.isArray(params) || !params.length) return ''
-            const ts = params[0].value[0]
-            const date = new Date(ts)
-            const head = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-            const lines = params.map(
-              (p: any) => `${p.marker}${p.seriesName}：${p.value[1]} mmHg`
-            )
-            return `${head}\n${lines.join('\n')}`
-          }
-        },
-        legend: {
-          data: ['收缩压', '舒张压'],
-          bottom: 0,
-          textStyle: { fontSize: 11, color: '#64748b' }
-        },
-        grid: { left: 12, right: 12, top: 28, bottom: 36, containLabel: true },
-        xAxis: {
-          type: 'time',
-          axisLine: { lineStyle: { color: '#e2e8f0' } },
-          axisLabel: {
-            color: '#94a3b8',
-            fontSize: 10,
-            formatter(value: number) {
-              const d = new Date(value)
-              return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-            }
-          },
-          splitLine: { show: true, lineStyle: { type: 'dashed', color: '#f1f5f9' } }
-        },
-        yAxis: {
-          type: 'value',
-          min: yMin,
-          max: yMax,
-          name: 'mmHg',
-          nameTextStyle: { color: '#94a3b8', fontSize: 10 },
-          axisLine: { show: false },
-          axisLabel: { color: '#94a3b8', fontSize: 10 },
-          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } }
-        },
-        series: [
-          {
-            name: '收缩压',
-            type: 'line',
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 6,
-            data: sysData,
-            lineStyle: { width: 2.5, color: meta.value.accentColor },
-            itemStyle: { color: meta.value.accentColor }
-          },
-          {
-            name: '舒张压',
-            type: 'line',
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 6,
-            data: diaData,
-            lineStyle: { width: 2.5, color: meta.value.chartLine2 },
-            itemStyle: { color: meta.value.chartLine2 }
-          }
-        ]
-      },
-      true
-    )
-    return
-  }
-
-  const vals = pts.map((r) => r.value_1)
-  const minV = Math.min(...vals)
-  const maxV = Math.max(...vals)
-  const pad = Math.max(1, Math.round((maxV - minV) * 0.12) || maxV * 0.05)
-  const yMin = Math.floor(minV - pad)
-  const yMax = Math.ceil(maxV + pad)
-  const lineData = times.map((t, i) => [t, vals[i]] as [number, number])
-  const lineColor = meta.value.accentColor
-
-  chart.setOption(
-    {
-      color: [lineColor],
-      tooltip: {
-        trigger: 'axis',
-        confine: true,
-        formatter(params: any) {
-          const p = params[0]
-          if (!p) return ''
-          const ts = p.value[0]
-          const date = new Date(ts)
-          const head = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-          return `${head}\n${meta.value.label}：${p.value[1]} ${meta.value.unit}`
-        }
-      },
-      grid: { left: 12, right: 12, top: 20, bottom: 24, containLabel: true },
-      xAxis: {
-        type: 'time',
-        axisLine: { lineStyle: { color: '#e2e8f0' } },
-        axisLabel: {
-          color: '#94a3b8',
-          fontSize: 10,
-          formatter(value: number) {
-            const d = new Date(value)
-            return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-          }
-        },
-        splitLine: { show: true, lineStyle: { type: 'dashed', color: '#f1f5f9' } }
-      },
-      yAxis: {
-        type: 'value',
-        min: yMin,
-        max: yMax,
-        name: meta.value.unit,
-        nameTextStyle: { color: '#94a3b8', fontSize: 10 },
-        axisLine: { show: false },
-        axisLabel: { color: '#94a3b8', fontSize: 10 },
-        splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } }
-      },
-      series: [
-        {
-          name: meta.value.label,
-          type: 'line',
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 6,
-          data: lineData,
-          lineStyle: { width: 2.5, color: lineColor },
-          itemStyle: { color: lineColor },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: `${lineColor}33` },
-              { offset: 1, color: `${lineColor}08` }
-            ])
-          }
-        }
-      ]
-    },
-    true
-  )
-}
-
-watch(
-  () => [metricType.value, chartSource.value.length, chartHasEnough.value],
-  () => nextTick(() => tryRenderChart())
-)
 
 function openForm() {
   formSys.value = ''
@@ -934,10 +771,11 @@ function openMeasurementReminders() {
   font-size: 12px;
   color: #94a3b8;
 }
-.echarts-dom {
+.chart-wrapper {
   width: 100%;
-  height: 280px;
   margin-top: 8px;
+  display: flex;
+  justify-content: center;
 }
 
 .history-divider {

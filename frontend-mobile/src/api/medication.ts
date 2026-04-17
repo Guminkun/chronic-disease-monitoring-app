@@ -194,3 +194,41 @@ export const getMakeupHistory = (skip: number = 0, limit: number = 50, memberId?
     params
   })
 }
+
+// WeChat Subscription Message APIs
+export interface WechatTemplateResponse {
+  template_id: string
+  template_name: string
+}
+
+export interface SubscriptionStatusResponse {
+  is_subscribed: boolean
+  remaining_count: number
+}
+
+export interface ConfirmSubscriptionData {
+  template_id: string
+  code: string
+}
+
+export const getSubscribeMessageTemplate = (): Promise<WechatTemplateResponse> => {
+  return request({
+    url: '/medications/subscribe-message',
+    method: 'GET'
+  })
+}
+
+export const confirmSubscription = (data: ConfirmSubscriptionData) => {
+  return request({
+    url: '/medications/confirm-subscription',
+    method: 'POST',
+    data
+  })
+}
+
+export const getSubscriptionStatus = (): Promise<SubscriptionStatusResponse> => {
+  return request({
+    url: '/medications/subscription-status',
+    method: 'GET'
+  })
+}

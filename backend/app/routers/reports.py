@@ -424,6 +424,46 @@ IMAGING_KEYWORDS = [
     '检查部位', '检查方式', '检查方法', '影像表现'
 ]
 
+REPORT_TYPE_RULES = [
+    {'keywords': ['血常规', '白细胞', '红细胞', '血小板', '血红蛋白'], 'name': '血常规'},
+    {'keywords': ['尿常规', '尿液', '尿蛋白'], 'name': '尿常规'},
+    {'keywords': ['肝功能', '谷丙', '谷草', '转氨酶', '胆红素'], 'name': '肝功能'},
+    {'keywords': ['肾功能', '肌酐', '尿素', '尿酸'], 'name': '肾功能'},
+    {'keywords': ['血糖', '葡萄糖', '糖化血红蛋白'], 'name': '血糖检测'},
+    {'keywords': ['血脂', '胆固醇', '甘油三酯', '低密度', '高密度'], 'name': '血脂检测'},
+    {'keywords': ['电解质', '钾', '钠', '氯', '钙'], 'name': '电解质'},
+    {'keywords': ['甲状腺', 'TSH', 'T3', 'T4', 'FT3', 'FT4'], 'name': '甲状腺功能'},
+    {'keywords': ['凝血', '凝血酶原', 'APTT', 'INR'], 'name': '凝血功能'},
+    {'keywords': ['心肌酶', '肌酸激酶', 'CK-MB', '肌红蛋白'], 'name': '心肌酶谱'},
+    {'keywords': ['肿瘤标志物', 'AFP', 'CEA', 'CA125', 'CA199', 'PSA'], 'name': '肿瘤标志物'},
+    {'keywords': ['乙肝', 'HBsAg', 'HBsAb', 'HBeAg'], 'name': '乙肝五项'},
+    {'keywords': ['CT', 'CT检查', '断层'], 'name': 'CT检查'},
+    {'keywords': ['MRI', '核磁', '磁共振'], 'name': 'MRI检查'},
+    {'keywords': ['X光', 'X线', '胸片', 'X射线'], 'name': 'X线检查'},
+    {'keywords': ['超声', 'B超', '彩超', '超声检查'], 'name': '超声检查'},
+    {'keywords': ['心电图', 'ECG', '心电'], 'name': '心电图'},
+    {'keywords': ['胃镜', '胃镜检查'], 'name': '胃镜检查'},
+    {'keywords': ['肠镜', '肠镜检查', '结肠镜'], 'name': '肠镜检查'},
+]
+
+IMAGING_TYPES = ['CT检查', 'MRI检查', 'X线检查', '超声检查', '心电图', '胃镜检查', '肠镜检查']
+
+def detect_report_type(text: str) -> str:
+    """根据文本内容识别报告小类"""
+    if not text:
+        return '其他检查'
+    text_lower = text.lower()
+    for rule in REPORT_TYPE_RULES:
+        if any(kw.lower() in text_lower for kw in rule['keywords']):
+            return rule['name']
+    return '其他检查'
+
+def categorize_report(type_name: str) -> str:
+    """根据小类判断大类: lab/imaging"""
+    if type_name in IMAGING_TYPES:
+        return 'imaging'
+    return 'lab'
+
 def classify_report_by_text(text: str, metrics_count: int = 0) -> str:
     """
     根据文本内容自动分类报告
@@ -528,14 +568,9 @@ async def auto_classify_report(
             raise HTTPException(status_code=504, detail="OCR服务超时，请稍后重试")
         pass
     
-    report_category = classify_report_by_text(ocr_text, len(parsed_metrics))
+    report_type_name = detect_report_type(ocr_text)
     
-    category_names = {
-        'lab': '化验单',
-        'imaging': '影像报告',
-        'unknown': '未分类'
-    }
-    report_type_name = category_names.get(report_category, '未分类')
+    report_category = categorize_report(report_type_name)
     
     report_data = {"ocr_text": ocr_text, "category": report_category}
     report_data.update(basic_info)

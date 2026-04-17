@@ -2,6 +2,39 @@
   <view class="edit-member-page">
     <scroll-view scroll-y class="scroll-container">
       <view class="form-container">
+        <!-- 头像上传 -->
+        <view class="avatar-section">
+          <!-- #ifdef MP-WEIXIN -->
+          <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar" :key="avatarKey">
+            <image 
+              v-if="formData.avatar_url" 
+              :src="formData.avatar_url" 
+              class="avatar-image"
+              mode="aspectFill"
+              :key="formData.avatar_url"
+            />
+            <view v-else class="avatar-placeholder">
+              <text class="plus-icon">+</text>
+              <text class="avatar-text">上传头像</text>
+            </view>
+          </button>
+          <!-- #endif -->
+          <!-- #ifndef MP-WEIXIN -->
+          <view class="avatar-btn" @click="chooseImage">
+            <image 
+              v-if="formData.avatar_url" 
+              :src="formData.avatar_url" 
+              class="avatar-image"
+              mode="aspectFill"
+            />
+            <view v-else class="avatar-placeholder">
+              <text class="plus-icon">+</text>
+              <text class="avatar-text">上传头像</text>
+            </view>
+          </view>
+          <!-- #endif -->
+        </view>
+        
         <view class="form-section">
           <view class="section-title">
             <text class="required-mark">*</text>
@@ -10,12 +43,23 @@
           
           <view class="form-item">
             <text class="label"><text class="required-mark">*</text>昵称</text>
+            <!-- #ifdef MP-WEIXIN -->
+            <input
+              v-model="formData.nickname"
+              type="nickname"
+              class="input"
+              placeholder="点击获取微信昵称"
+              @blur="onNicknameChange"
+            />
+            <!-- #endif -->
+            <!-- #ifndef MP-WEIXIN -->
             <input
               v-model="formData.nickname"
               class="input"
               placeholder="请输入昵称"
               maxlength="20"
             />
+            <!-- #endif -->
           </view>
           
           <view class="form-item">
@@ -205,6 +249,7 @@ import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
 import { useUserStore } from '@/stores/user'
+import { uploadAvatar } from '@/api/member'
 import type { MemberFormData } from '@/api/member'
 
 const memberStore = useMemberStore()
@@ -212,9 +257,12 @@ const userStore = useUserStore()
 
 const memberId = ref('')
 const isCustomRelation = ref(false)
+const avatarUploading = ref(false)
+const avatarKey = ref(0)
 const formData = ref<MemberFormData>({
   nickname: '',
   relation: '',
+  avatar_url: '',
   age: '',
   gender: '',
   height: '',
@@ -275,6 +323,7 @@ const loadMemberData = async () => {
     formData.value = {
       nickname: member.nickname,
       relation: member.relation,
+      avatar_url: member.avatar_url || '',
       age: member.age || '',
       gender: member.gender || '',
       height: member.height || '',
@@ -287,6 +336,57 @@ const loadMemberData = async () => {
       surgery_history: member.surgery_history || '',
       other_notes: member.other_notes || ''
     }
+  }
+}
+
+const onChooseAvatar = async (e: any) => {
+  const avatarUrl = e.detail.avatarUrl
+  if (!avatarUrl) return
+  
+  avatarUploading.value = true
+  uni.showLoading({ title: '上传中...' })
+  
+  try {
+    const result = await uploadAvatar(avatarUrl)
+    formData.value.avatar_url = result.url
+    avatarKey.value++
+    uni.showToast({ title: '头像上传成功', icon: 'success' })
+  } catch (error) {
+    console.error('头像上传失败:', error)
+    uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+  } finally {
+    avatarUploading.value = false
+    uni.hideLoading()
+  }
+}
+
+const chooseImage = () => {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      const tempFilePath = res.tempFilePaths[0]
+      avatarUploading.value = true
+      uni.showLoading({ title: '上传中...' })
+      try {
+        const result = await uploadAvatar(tempFilePath)
+        formData.value.avatar_url = result.url
+        uni.showToast({ title: '头像上传成功', icon: 'success' })
+      } catch (error) {
+        console.error('头像上传失败:', error)
+        uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+      } finally {
+        avatarUploading.value = false
+        uni.hideLoading()
+      }
+    }
+  })
+}
+
+const onNicknameChange = (e: any) => {
+  if (e.detail.value) {
+    formData.value.nickname = e.detail.value
   }
 }
 
@@ -350,6 +450,10 @@ const handleSave = async () => {
     relation: formData.value.relation.trim()
   }
   
+  if (formData.value.avatar_url) {
+    submitData.avatar_url = formData.value.avatar_url
+  }
+  
   if (formData.value.age !== '' && formData.value.age !== null && formData.value.age !== undefined) {
     submitData.age = formData.value.age
   }
@@ -387,6 +491,7 @@ const handleSave = async () => {
   const updatedMember = await memberStore.editMember(memberId.value, submitData)
   
   if (updatedMember) {
+    await memberStore.loadMembers()
     setTimeout(() => {
       uni.navigateBack()
     }, 1500)
@@ -394,7 +499,7 @@ const handleSave = async () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .edit-member-page {
   min-height: 100vh;
   background: #f0f4ff;
@@ -407,6 +512,55 @@ const handleSave = async () => {
 .form-container {
   padding: 16px;
   box-sizing: border-box;
+}
+
+.avatar-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  
+  .avatar-btn {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: none;
+    border: none;
+    padding: 0;
+    overflow: hidden;
+    
+    &::after {
+      border: none;
+    }
+  }
+  
+  .avatar-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+  }
+  
+  .avatar-placeholder {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    
+    .plus-icon {
+      font-size: 32px;
+      color: #94a3b8;
+    }
+    
+    .avatar-text {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+  }
 }
 
 .form-section {

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # WeChat Mini Program Configuration
     WECHAT_APPID: str = ""
     WECHAT_SECRET: str = ""
+    WECHAT_MEDICATION_TEMPLATE_ID: str = ""
 
     # CORS配置
     CORS_ORIGINS: List[str] = [

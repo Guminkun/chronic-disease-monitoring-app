@@ -1,12 +1,18 @@
 <template>
   <view class="container">
     <view class="profile-header">
-      <view class="user-info" v-if="userStore.token">
+      <view class="user-info" v-if="userStore.token" @click="handleEditProfile">
         <view class="avatar">
-          <text class="avatar-text">{{ userInitial }}</text>
+          <image 
+            v-if="userStore.user?.wechat_avatar" 
+            :src="userStore.user.wechat_avatar" 
+            class="avatar-image"
+            mode="aspectFill"
+          />
+          <text v-else class="avatar-text">{{ userInitial }}</text>
         </view>
         <view class="info-content">
-          <text class="user-name">{{ userStore.user?.name || '用户' }}</text>
+          <text class="user-name">{{ userStore.user?.wechat_nickname || userStore.user?.name || '用户' }}</text>
           <text class="user-role">患者端</text>
         </view>
       </view>
@@ -99,7 +105,7 @@ const goToLogin = () => {
 
 const handleEditProfile = () => {
   if (!userStore.token) return goToLogin()
-  uni.showToast({ title: '功能开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/profile/edit' })
 }
 
 const goToMedicationHistory = () => {
@@ -172,6 +178,7 @@ const handleLogout = () => {
   align-items: center;
   justify-content: center;
   border: 2px solid #dbeafe;
+  overflow: hidden;
 }
 .placeholder {
   background-color: #f1f5f9;
@@ -181,6 +188,10 @@ const handleLogout = () => {
   font-size: 24px;
   font-weight: bold;
   color: #3b82f6;
+}
+.avatar-image {
+  width: 100%;
+  height: 100%;
 }
 
 .info-content {

@@ -984,3 +984,31 @@ class UsageGuideListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+# --- WeChat Subscription ---
+class WechatSubscriptionBase(BaseModel):
+    """微信订阅消息基础模型"""
+    template_id: str = Field(..., description="模板ID")
+
+class WechatSubscriptionConfirm(WechatSubscriptionBase):
+    """确认订阅消息授权"""
+    code: str = Field(..., description="微信登录code，用于换取openid")
+
+class WechatSubscriptionResponse(WechatSubscriptionBase):
+    """微信订阅消息响应模型"""
+    id: int
+    user_id: UUID4
+    openid: str
+    is_subscribed: bool
+    subscribe_count: int
+    used_count: int
+    last_used_at: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class WechatTemplateResponse(BaseModel):
+    """微信模板ID响应"""
+    template_id: str
+    template_name: str
