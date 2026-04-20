@@ -530,6 +530,8 @@ class MedicationPlan(Base):
     
     is_active = Column(Boolean, default=True)
     is_temporary = Column(Boolean, default=False)
+    remind_enabled = Column(Boolean, default=False)
+    remind_advance_minutes = Column(Integer, default=5)  # 提前提醒时间（分钟）
     paused_until = Column(Date, nullable=True)
     stock = Column(Numeric(10, 2), nullable=True)
     notes = Column(Text, nullable=True)

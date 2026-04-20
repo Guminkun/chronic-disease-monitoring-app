@@ -583,6 +583,8 @@ class MedicationPlanBase(BaseModel):
     notes: Optional[str] = None
     patient_disease_id: Optional[int] = None
     is_temporary: bool = False
+    remind_enabled: bool = False
+    remind_advance_minutes: int = Field(5, description="提前提醒时间（分钟）")
     stock: Optional[float] = None
 
 # --- Notification Center ---
@@ -811,12 +813,14 @@ class MedicationPlanUpdate(BaseModel):
     end_date: Optional[date] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    remind_enabled: Optional[bool] = None
     stock: Optional[float] = None # 新增
 
 class MedicationPlanResponse(MedicationPlanBase):
     id: int
     patient_id: UUID4
     is_active: bool
+    remind_enabled: bool = False
     created_at: datetime
     patient_disease: Optional[PatientDiseaseResponse] = None
     

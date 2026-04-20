@@ -19,6 +19,8 @@ export interface MedicationPlan {
   patient_disease_id?: number
   is_temporary?: boolean
   is_active?: boolean
+  remind_enabled?: boolean
+  remind_advance_minutes?: number // 提前提醒时间（分钟）
   stock?: number
 }
 

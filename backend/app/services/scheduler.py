@@ -29,10 +29,6 @@ class BackgroundScheduler:
             now = datetime.now()
             today = now.date()
             
-            # 提前5分钟提醒
-            reminder_window_start = now - timedelta(minutes=2)
-            reminder_window_end = now + timedelta(minutes=2)
-            
             # 查询需要提醒的药品计划
             plans = db.query(MedicationPlan).filter(
                 MedicationPlan.is_active == True,
@@ -81,8 +77,15 @@ class BackgroundScheduler:
                             datetime.min.time().replace(hour=hour, minute=minute)
                         )
                         
-                        # 检查是否在提醒窗口内
-                        if not (reminder_window_start <= scheduled_time <= reminder_window_end):
+                        # 使用药品计划的提前提醒时间，默认5分钟
+                        advance_minutes = plan.remind_advance_minutes or 5
+                        
+                        # 计算提醒时间窗口：提前N分钟到准点
+                        reminder_window_start = scheduled_time - timedelta(minutes=advance_minutes)
+                        reminder_window_end = scheduled_time
+                        
+                        # 检查当前时间是否在提醒窗口内
+                        if not (reminder_window_start <= now <= reminder_window_end):
                             continue
                         
                         # 检查是否已发送过提醒

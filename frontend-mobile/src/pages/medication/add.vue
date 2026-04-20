@@ -461,6 +461,12 @@ const isEndDateNear = computed(() => {
 
 // 提醒设置
 const advanceMinutes = ref(5)
+const advanceOptions = [
+  { label: '2分钟', value: 2 },
+  { label: '5分钟', value: 5 },
+  { label: '10分钟', value: 10 },
+  { label: '15分钟', value: 15 }
+]
 const advanceLabel = computed(() => `${advanceMinutes.value}分钟`)
 
 const subscriptionStatus = ref({
@@ -742,9 +748,9 @@ const openMealTime = () => {
 
 const openAdvance = () => {
   uni.showActionSheet({
-    itemList: ['5分钟','10分钟','15分钟','30分钟'],
+    itemList: advanceOptions.map(opt => opt.label),
     success: (res: any) => {
-      advanceMinutes.value = [5, 10, 15, 30][res.tapIndex]
+      advanceMinutes.value = advanceOptions[res.tapIndex].value
     }
   })
 }
@@ -867,7 +873,8 @@ const handleConfirm = async () => {
     patient_disease_id: pickedDiseaseId.value || undefined,
     notes: form.value.notes_text || undefined,
     is_temporary: isTemporary.value,
-    remind_enabled: form.value.remind === 'on'
+    remind_enabled: form.value.remind === 'on',
+    remind_advance_minutes: advanceMinutes.value
   }
   try {
     uni.showLoading({ title: '保存中' })
@@ -938,6 +945,7 @@ const loadPlanDetails = async (id: number) => {
     form.value.stock = plan.stock || 0
     form.value.notes_text = plan.notes || ''
     form.value.remind = plan.remind_enabled ? 'on' : 'off'
+    advanceMinutes.value = plan.remind_advance_minutes || 5
     
     if (plan.frequency_type === 'interval') {
       freqIndex.value = 4
