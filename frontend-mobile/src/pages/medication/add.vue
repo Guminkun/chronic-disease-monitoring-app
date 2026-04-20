@@ -301,11 +301,23 @@
         </view>
 
         <template v-if="form.remind === 'on'">
-          <view class="setting-row" @click="openRingtone">
-            <text class="setting-label">提醒铃声</text>
-            <view class="setting-value">
-              <text class="value-text">{{ ringtone }}</text>
-              <text class="value-arrow">›</text>
+          <view class="subscription-status">
+            <view class="status-row">
+              <text class="status-label">订阅状态</text>
+              <text class="status-value" :class="subscriptionStatus.is_subscribed ? 'subscribed' : 'not-subscribed'">
+                {{ subscriptionStatus.is_subscribed ? '✅ 已订阅' : '⚠️ 未订阅' }}
+              </text>
+            </view>
+            <view class="status-row">
+              <text class="status-label">剩余次数</text>
+              <text class="status-value" :class="getRemainClass(subscriptionStatus.remaining_count)">
+                {{ subscriptionStatus.remaining_count }} 次
+              </text>
+            </view>
+            <view v-if="subscriptionStatus.is_subscribed && subscriptionStatus.remaining_count <= 3" class="renew-section">
+              <button class="renew-btn" @click="handleRenew">
+                <text class="renew-text">续订提醒</text>
+              </button>
             </view>
           </view>
 
@@ -448,9 +460,42 @@ const isEndDateNear = computed(() => {
 })
 
 // 提醒设置
-const ringtone = ref('默认铃声')
 const advanceMinutes = ref(5)
 const advanceLabel = computed(() => `${advanceMinutes.value}分钟`)
+
+const subscriptionStatus = ref({
+  is_subscribed: false,
+  remaining_count: 0
+})
+
+const loadSubscriptionStatus = async () => {
+  try {
+    const res: any = await medApi.getSubscriptionStatus()
+    subscriptionStatus.value = {
+      is_subscribed: res.is_subscribed || false,
+      remaining_count: res.remaining_count || 0
+    }
+  } catch (e) {
+    console.error('Failed to load subscription status:', e)
+    subscriptionStatus.value = {
+      is_subscribed: false,
+      remaining_count: 0
+    }
+  }
+}
+
+const getRemainClass = (count: number) => {
+  if (count === 0) return 'zero'
+  if (count <= 3) return 'low'
+  return 'normal'
+}
+
+const handleRenew = async () => {
+  const subscribed = await requestSubscribeMessage()
+  if (subscribed) {
+    await loadSubscriptionStatus()
+  }
+}
 
 // 疗程
 const courseDays = ref<number | null>(null)
@@ -695,15 +740,6 @@ const openMealTime = () => {
   })
 }
 
-const openRingtone = () => {
-  uni.showActionSheet({
-    itemList: ['默认铃声','清脆提示音','轻柔提示音'],
-    success: (res: any) => {
-      ringtone.value = ['默认铃声','清脆提示音','轻柔提示音'][res.tapIndex]
-    }
-  })
-}
-
 const openAdvance = () => {
   uni.showActionSheet({
     itemList: ['5分钟','10分钟','15分钟','30分钟'],
@@ -830,7 +866,8 @@ const handleConfirm = async () => {
     duration_days: isTemporary.value ? durationDays.value : (courseDays.value || undefined),
     patient_disease_id: pickedDiseaseId.value || undefined,
     notes: form.value.notes_text || undefined,
-    is_temporary: isTemporary.value
+    is_temporary: isTemporary.value,
+    remind_enabled: form.value.remind === 'on'
   }
   try {
     uni.showLoading({ title: '保存中' })
@@ -900,6 +937,7 @@ const loadPlanDetails = async (id: number) => {
     form.value.interval_days = plan.frequency_type === 'interval' ? Number(plan.frequency_value) : 2
     form.value.stock = plan.stock || 0
     form.value.notes_text = plan.notes || ''
+    form.value.remind = plan.remind_enabled ? 'on' : 'off'
     
     if (plan.frequency_type === 'interval') {
       freqIndex.value = 4
@@ -944,6 +982,7 @@ onLoad((options: any) => {
 onShow(() => {
   loadDiseases()
   loadExistingPlans()
+  loadSubscriptionStatus()
 })
 </script>
 
@@ -1362,6 +1401,82 @@ onShow(() => {
 /* 提醒开关 */
 .remind-switch {
   transform: scale(0.85);
+}
+
+.subscription-status {
+  margin-top: 20rpx;
+  padding: 24rpx;
+  background: #f8fafc;
+  border-radius: 16rpx;
+  border: 2rpx solid #e2e8f0;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.status-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.status-label {
+  font-size: 28rpx;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.status-value.subscribed {
+  color: #16a34a;
+}
+
+.status-value.not-subscribed {
+  color: #dc2626;
+}
+
+.status-value.normal {
+  color: #16a34a;
+}
+
+.status-value.low {
+  color: #f97316;
+}
+
+.status-value.zero {
+  color: #dc2626;
+}
+
+.renew-section {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.renew-btn {
+  width: 100%;
+  height: 72rpx;
+  border-radius: 14rpx;
+  background: #2563eb;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.renew-btn::after {
+  border: none;
+}
+
+.renew-text {
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
 }
 
 /* 备注文本域 */

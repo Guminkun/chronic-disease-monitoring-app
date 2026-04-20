@@ -23,6 +23,20 @@
       size="medium"
     />
 
+    <!-- 订阅状态提示 -->
+    <view v-if="isLoggedIn() && showSubscriptionWarning" class="subscription-warning">
+      <view class="warning-content">
+        <text class="warning-icon">⚠️</text>
+        <view class="warning-text">
+          <text class="warning-title">用药提醒订阅次数不足</text>
+          <text class="warning-desc">剩余 {{ subscriptionStatus.remaining_count }} 次，请及时续订</text>
+        </view>
+      </view>
+      <button class="warning-btn" @click="handleRenewFromList">
+        <text>续订</text>
+      </button>
+    </view>
+
     <!-- 即将到期的临时用药提醒 -->
     <view v-if="expiringTempPlans.length > 0" class="expiring-section">
       <view class="expiring-header">
@@ -502,6 +516,87 @@ const handleEnd = async (plan: any) => {
   })
 }
 
+const subscriptionStatus = ref({
+  is_subscribed: false,
+  remaining_count: 0
+})
+
+const showSubscriptionWarning = computed(() => {
+  const hasReminders = planList.value.some((p: any) => p.remind_enabled)
+  return hasReminders && subscriptionStatus.value.remaining_count <= 3
+})
+
+const loadSubscriptionStatus = async () => {
+  if (!isLoggedIn()) return
+  try {
+    const res: any = await medApi.getSubscriptionStatus()
+    subscriptionStatus.value = {
+      is_subscribed: res.is_subscribed || false,
+      remaining_count: res.remaining_count || 0
+    }
+  } catch (e) {
+    console.error('Failed to load subscription status:', e)
+  }
+}
+
+const handleRenewFromList = async () => {
+  // #ifdef MP-WEIXIN
+  try {
+    const templateRes: any = await medApi.getSubscribeMessageTemplate()
+    const templateId = templateRes.template_id
+    
+    if (!templateId) {
+      uni.showToast({ title: '订阅消息模板未配置', icon: 'none' })
+      return
+    }
+    
+    return new Promise((resolve) => {
+      (uni as any).requestSubscribeMessage({
+        tmplIds: [templateId],
+        success: async (res: any) => {
+          if (res[templateId] === 'accept') {
+            try {
+              const loginRes: any = await (uni as any).login()
+              if (loginRes.code) {
+                const confirmData: medApi.ConfirmSubscriptionData = {
+                  template_id: templateId,
+                  code: loginRes.code
+                }
+                await medApi.confirmSubscription(confirmData)
+                uni.showToast({ title: '订阅成功', icon: 'success' })
+                await loadSubscriptionStatus()
+                resolve(true)
+              } else {
+                resolve(false)
+              }
+            } catch (e) {
+              console.error('Confirm subscription error:', e)
+              resolve(false)
+            }
+          } else {
+            uni.showToast({ title: '您拒绝了订阅', icon: 'none' })
+            resolve(false)
+          }
+        },
+        fail: (err: any) => {
+          console.error('Request subscribe message failed:', err)
+          uni.showToast({ title: '订阅失败', icon: 'none' })
+          resolve(false)
+        }
+      })
+    })
+  } catch (e) {
+    console.error('Get template error:', e)
+    return false
+  }
+  // #endif
+  
+  // #ifndef MP-WEIXIN
+  uni.showToast({ title: '仅支持微信小程序', icon: 'none' })
+  return false
+  // #endif
+}
+
 const switchTab = (index: number) => {
   currentTab.value = index
   if (index === 0) loadDailyTasks()
@@ -519,7 +614,7 @@ const loadData = async () => {
     return
   }
   await memberStore.loadMembers()
-  await Promise.all([loadDailyTasks(), loadPlans()])
+  await Promise.all([loadDailyTasks(), loadPlans(), loadSubscriptionStatus()])
 }
 
 const loadDailyTasks = async () => {
@@ -1840,5 +1935,64 @@ const closePlan = () => {
 
 .btn-confirm::after {
   border: none;
+}
+
+.subscription-warning {
+  margin: 0 20px 14px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.warning-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.warning-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.warning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warning-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.warning-desc {
+  font-size: 12px;
+  color: #b45309;
+}
+
+.warning-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: #f97316;
+  border: none;
+  margin: 0;
+}
+
+.warning-btn::after {
+  border: none;
+}
+
+.warning-btn text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
 }
 </style>
