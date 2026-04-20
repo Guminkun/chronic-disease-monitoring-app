@@ -585,6 +585,7 @@ class MedicationPlanBase(BaseModel):
     is_temporary: bool = False
     remind_enabled: bool = False
     remind_advance_minutes: int = Field(5, description="提前提醒时间（分钟）")
+    extend_dismissed: bool = Field(False, description="是否忽略延期提醒")
     stock: Optional[float] = None
 
 # --- Notification Center ---

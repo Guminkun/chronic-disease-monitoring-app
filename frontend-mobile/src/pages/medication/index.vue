@@ -52,8 +52,8 @@
           <view class="ep-btn extend" @click="handleExtend(plan)">
             <text>延期</text>
           </view>
-          <view class="ep-btn end" @click="handleEnd(plan)">
-            <text>结束</text>
+          <view class="ep-btn end" @click="handleDismissExtend(plan)">
+            <text>忽略</text>
           </view>
         </view>
       </view>
@@ -252,9 +252,9 @@
             <text class="da-icon">📅</text>
             <text class="da-text">延期</text>
           </view>
-          <view class="da-btn end" @click="handleEnd(selectedPlan)">
-            <text class="da-icon">✓</text>
-            <text class="da-text">结束用药</text>
+          <view class="da-btn end" @click="handleDismissExtend(selectedPlan)">
+            <text class="da-icon">✕</text>
+            <text class="da-text">忽略延期</text>
           </view>
         </view>
       </view>
@@ -351,7 +351,8 @@ const filteredPlanList = computed(() => {
 
 const expiringTempPlans = computed(() => {
   return planList.value.filter(p => {
-    if (!p.is_temporary || !p.end_date) return false
+    // 只显示临时用药，有结束日期，且未忽略延期提醒的
+    if (!p.is_temporary || !p.end_date || p.extend_dismissed) return false
     const days = getRemainingDays(p)
     return days !== null && days >= 0 && days <= 3
   })
@@ -497,18 +498,28 @@ const confirmExtend = async () => {
   }
 }
 
-const handleEnd = async (plan: any) => {
+const handleDismissExtend = async (plan: any) => {
   uni.showModal({
-    title: '结束用药',
-    content: `确定要结束"${plan.name}"的用药计划吗？`,
+    title: '忽略延期提醒',
+    content: `确定要忽略"${plan.name}"的延期提醒吗？\n\n忽略后，该药品仍会保留在用药列表中，只是不再提示延期。`,
+    confirmText: '确定忽略',
+    cancelText: '取消',
     success: async (res) => {
       if (res.confirm) {
         try {
-          await medApi.updatePlan(plan.id, { is_active: false })
-          uni.showToast({ title: '已结束' })
-          loadPlans()
-          loadDailyTasks()
+          uni.showLoading({ title: '处理中' })
+          await medApi.updatePlan(plan.id, { extend_dismissed: true })
+          uni.hideLoading()
+          uni.showToast({ title: '已忽略延期提醒', icon: 'success' })
+          
+          // 关闭详情弹窗
+          detailVisible.value = false
+          
+          // 重新加载数据
+          await loadPlans()
+          await loadDailyTasks()
         } catch {
+          uni.hideLoading()
           uni.showToast({ title: '操作失败', icon: 'none' })
         }
       }

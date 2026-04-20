@@ -21,6 +21,7 @@ export interface MedicationPlan {
   is_active?: boolean
   remind_enabled?: boolean
   remind_advance_minutes?: number // 提前提醒时间（分钟）
+  extend_dismissed?: boolean // 是否忽略延期提醒
   stock?: number
 }
 
