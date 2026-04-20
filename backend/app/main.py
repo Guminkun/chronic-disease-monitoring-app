@@ -2,8 +2,10 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from .routers import auth, patients, doctors, common, chat, indicators, report_types, hospitals, diseases, reports, medications, education, medications_dict, dashboard, imaging_checks, feedback, usage_guides, members, notifications, files, upload
+from .services.scheduler import scheduler
 import time
 import json
+import asyncio
 
 from .database import engine, Base
 from .config import settings
@@ -64,6 +66,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时执行"""
+    logger.info("🚀 应用启动中...")
+    
+    # 启动后台定时任务
+    scheduler.start()
+    logger.info("✅ 后台定时任务已启动")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭时执行"""
+    logger.info("🛑 应用关闭中...")
+    
+    # 停止后台定时任务
+    await scheduler.stop()
+    logger.info("✅ 后台定时任务已停止")
+
 
 # Include Routers
 app.include_router(auth.router)
