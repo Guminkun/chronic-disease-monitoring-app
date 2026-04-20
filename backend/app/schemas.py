@@ -815,7 +815,9 @@ class MedicationPlanUpdate(BaseModel):
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     remind_enabled: Optional[bool] = None
-    stock: Optional[float] = None # 新增
+    remind_advance_minutes: Optional[int] = None
+    extend_dismissed: Optional[bool] = None
+    stock: Optional[float] = None
 
 class MedicationPlanResponse(MedicationPlanBase):
     id: int
