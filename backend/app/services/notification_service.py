@@ -85,7 +85,7 @@ class NotificationService:
     @staticmethod
     def generate_medication_reminders(db: Session, patient_id: Optional[UUID] = None):
         today = date.today()
-        remind_before_days = 7
+        remind_before_days = 2
         
         query = db.query(models.MedicationPlan).filter(
             models.MedicationPlan.is_active == True
@@ -142,7 +142,7 @@ class NotificationService:
                 category="health",
                 source_id=str(plan.id),
                 source_type="medication_plan",
-                priority=10 if days_left <= 1 else (8 if days_left <= 3 else 5)
+                priority=10 if days_left <= 1 else 8
             )
             notifications.append(notification)
         
