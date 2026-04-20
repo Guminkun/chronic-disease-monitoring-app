@@ -102,8 +102,8 @@ class WechatSubscriptionService:
             "template_id": self.template_id,
             "page": "pages/medication/index",
             "data": {
-                "thing1": {"value": medication_name[:20] if len(medication_name) > 20 else medication_name},
-                "time2": {"value": take_time},
+                "time1": {"value": take_time},
+                "thing2": {"value": medication_name[:20] if len(medication_name) > 20 else medication_name},
                 "thing3": {"value": dosage[:20] if len(dosage) > 20 else dosage},
                 "thing4": {"value": notes[:20] if notes else "请按时服药"}
             },
