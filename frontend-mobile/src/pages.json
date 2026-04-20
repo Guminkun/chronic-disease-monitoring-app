@@ -3,7 +3,9 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "首页"
+				"navigationBarTitleText": "首页",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
 			}
 		},
 		{
@@ -45,15 +47,17 @@
 		{
 			"path": "pages/medication/index",
 			"style": {
-				"navigationBarTitleText": "按时吃药",
-				"navigationBarBackgroundColor": "#ffffff"
+				"navigationBarTitleText": "用药",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
 			}
 		},
 		{
 			"path": "pages/monitor/index",
 			"style": {
-				"navigationBarTitleText": "居家监测",
-				"navigationBarBackgroundColor": "#ffffff"
+				"navigationBarTitleText": "监测",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
 			}
 		},
 		{
@@ -90,7 +94,9 @@
 		{
 			"path": "pages/profile/index",
 			"style": {
-				"navigationBarTitleText": "我的"
+				"navigationBarTitleText": "我的",
+				"navigationBarBackgroundColor": "#ffffff",
+				"navigationBarTextStyle": "black"
 			}
 		},
 		{

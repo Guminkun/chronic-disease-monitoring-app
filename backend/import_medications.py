@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import sys
 import os
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -39,14 +40,14 @@ def truncate(s, max_len):
 def import_medications():
     print("开始批量导入药品数据...")
     
-    files = [
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(2)_二级分类.xlsx",
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(3)_二级分类.xlsx",
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(4)_二级分类.xlsx",
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(5)_二级分类.xlsx",
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(6)_二级分类.xlsx",
-        "E:/BaiduNetdiskDownload/二级分类医药数据/药品说明书数据库_医药数据查询(7)_二级分类.xlsx"
-    ]
+    data_dir = Path("E:/BaiduNetdiskDownload/二级分类医药数据")
+    files = list(data_dir.glob("*.xlsx"))
+    
+    if not files:
+        print(f"未找到Excel文件: {data_dir}")
+        return
+    
+    print(f"找到 {len(files)} 个Excel文件")
     
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
@@ -66,7 +67,7 @@ def import_medications():
         return None if s == 'nan' or s == '' else s
     
     for file_idx, excel_path in enumerate(files):
-        print(f"\n=== 处理文件 {file_idx + 1}/6: {os.path.basename(excel_path)} ===")
+        print(f"\n=== 处理文件 {file_idx + 1}/{len(files)}: {excel_path.name} ===")
         
         df = pd.read_excel(excel_path)
         print(f"读取到 {len(df)} 条记录")
