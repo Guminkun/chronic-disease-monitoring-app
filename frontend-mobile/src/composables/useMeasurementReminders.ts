@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { addPatientReminder, deleteReminder, updateReminder, getPatientReminders } from '@/api/patient'
+import { addPatientReminder, deleteReminder, updateReminder, getPatientReminders, getMonitoringSubscribeMessageTemplate, confirmMonitoringSubscription, getMonitoringSubscriptionStatus } from '@/api/patient'
 import { isLoggedIn, checkLoginWithRedirect } from '@/utils/auth'
 
 export const MONITORING_METRIC_KEYS = [
@@ -136,6 +136,23 @@ export function useMeasurementReminders() {
       await loadReminders()
       reminderFormVisible.value = false
       uni.showToast({ title: '提醒已保存', icon: 'success' })
+      
+      // 新增提醒后，自动请求订阅（如果订阅次数不足）
+      if (!reminderEditTarget.value && subscriptionStatus.value.remaining_count <= 3) {
+        setTimeout(() => {
+          uni.showModal({
+            title: '开启提醒通知',
+            content: '需要订阅微信消息才能收到提醒，是否立即订阅？',
+            confirmText: '立即订阅',
+            cancelText: '稍后再说',
+            success: async (res) => {
+              if (res.confirm) {
+                await handleRenew()
+              }
+            }
+          })
+        }, 500)
+      }
     } catch {
       uni.showToast({ title: '保存失败', icon: 'none' })
     } finally {
@@ -182,6 +199,92 @@ export function useMeasurementReminders() {
     })
   }
 
+  // --- Subscription Management ---
+  
+  const subscriptionStatus = ref({
+    is_subscribed: false,
+    remaining_count: 0
+  })
+
+  const loadSubscriptionStatus = async () => {
+    if (!isLoggedIn()) {
+      subscriptionStatus.value = { is_subscribed: false, remaining_count: 0 }
+      return
+    }
+    try {
+      const res: any = await getMonitoringSubscriptionStatus()
+      subscriptionStatus.value = {
+        is_subscribed: res.is_subscribed || false,
+        remaining_count: res.remaining_count || 0
+      }
+    } catch {
+      subscriptionStatus.value = { is_subscribed: false, remaining_count: 0 }
+    }
+  }
+
+  const requestSubscribeMessage = async (): Promise<boolean> => {
+    // #ifdef MP-WEIXIN
+    try {
+      const templateRes: any = await getMonitoringSubscribeMessageTemplate()
+      const templateId = templateRes.template_id
+      
+      if (!templateId) {
+        uni.showToast({ title: '订阅消息模板未配置', icon: 'none' })
+        return false
+      }
+      
+      return new Promise((resolve) => {
+        (uni as any).requestSubscribeMessage({
+          tmplIds: [templateId],
+          success: async (res: any) => {
+            if (res[templateId] === 'accept') {
+              try {
+                const loginRes: any = await (uni as any).login()
+                if (loginRes.code) {
+                  await confirmMonitoringSubscription({
+                    template_id: templateId,
+                    code: loginRes.code
+                  })
+                  uni.showToast({ title: '订阅成功', icon: 'success' })
+                  resolve(true)
+                } else {
+                  resolve(false)
+                }
+              } catch {
+                resolve(false)
+              }
+            } else if (res[templateId] === 'reject') {
+              uni.showToast({ title: '您拒绝了订阅', icon: 'none' })
+              resolve(false)
+            } else {
+              uni.showToast({ title: '订阅已取消', icon: 'none' })
+              resolve(false)
+            }
+          },
+          fail: () => {
+            uni.showToast({ title: '订阅失败，请稍后重试', icon: 'none' })
+            resolve(false)
+          }
+        })
+      })
+    } catch {
+      return false
+    }
+    // #endif
+    
+    // #ifndef MP-WEIXIN
+    uni.showToast({ title: '仅支持微信小程序', icon: 'none' })
+    return false
+    // #endif
+  }
+
+  const handleRenew = async () => {
+    const subscribed = await requestSubscribeMessage()
+    if (subscribed) {
+      await loadSubscriptionStatus()
+    }
+  }
+
   return {
     metricTypeLabel: METRIC_TYPE_LABELS,
     allReminders,
@@ -204,6 +307,11 @@ export function useMeasurementReminders() {
     closeReminderForm,
     saveReminder,
     toggleReminderActive,
-    removeReminder
+    removeReminder,
+    // Subscription management
+    subscriptionStatus,
+    loadSubscriptionStatus,
+    requestSubscribeMessage,
+    handleRenew
   }
 }

@@ -299,3 +299,32 @@ export function checkinMedication(data: { plan_id: number, scheduled_time: strin
     data
   })
 }
+
+// --- Monitoring Reminder Subscription APIs ---
+
+export function getMonitoringSubscribeMessageTemplate() {
+  return request({
+    url: '/patients/reminders/monitoring/subscribe-message',
+    method: 'GET'
+  })
+}
+
+export interface MonitoringSubscriptionConfirmData {
+  template_id: string
+  code: string
+}
+
+export function confirmMonitoringSubscription(data: MonitoringSubscriptionConfirmData) {
+  return request({
+    url: '/patients/reminders/monitoring/confirm-subscription',
+    method: 'POST',
+    data
+  })
+}
+
+export function getMonitoringSubscriptionStatus() {
+  return request({
+    url: '/patients/reminders/monitoring/subscription-status',
+    method: 'GET'
+  })
+}

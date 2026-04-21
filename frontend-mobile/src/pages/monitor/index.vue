@@ -72,6 +72,27 @@
           </view>
         </view>
 
+        <!-- 订阅状态 -->
+        <view class="subscription-status">
+          <view class="status-row">
+            <text class="status-label">订阅状态</text>
+            <text class="status-value" :class="subscriptionStatus.is_subscribed ? 'subscribed' : 'not-subscribed'">
+              {{ subscriptionStatus.is_subscribed ? '✅ 已订阅' : '⚠️ 未订阅' }}
+            </text>
+          </view>
+          <view class="status-row">
+            <text class="status-label">剩余次数</text>
+            <text class="status-value" :class="getRemainClass(subscriptionStatus.remaining_count)">
+              {{ subscriptionStatus.remaining_count }} 次
+            </text>
+          </view>
+          <view v-if="subscriptionStatus.is_subscribed && subscriptionStatus.remaining_count <= 3" class="renew-section">
+            <button class="renew-btn" @click="handleRenew">
+              <text class="renew-text">续订提醒</text>
+            </button>
+          </view>
+        </view>
+
         <scroll-view scroll-y enable-flex class="drawer-history">
           <!-- 提醒列表空态 -->
           <view v-if="reminderPanelReminders.length === 0" class="rp-empty">
@@ -269,10 +290,19 @@ const {
   closeReminderForm,
   saveReminder,
   toggleReminderActive,
-  removeReminder
+  removeReminder,
+  subscriptionStatus,
+  loadSubscriptionStatus,
+  handleRenew
 } = useMeasurementReminders()
 
-onShow(async () => { await Promise.all([reloadAll(), loadReminders()]) })
+const getRemainClass = (count: number) => {
+  if (count === 0) return 'zero'
+  if (count <= 3) return 'low'
+  return 'normal'
+}
+
+onShow(async () => { await Promise.all([reloadAll(), loadReminders(), loadSubscriptionStatus()]) })
 </script>
 
 <style>
@@ -437,6 +467,67 @@ onShow(async () => { await Promise.all([reloadAll(), loadReminders()]) })
 /* ── 提醒管理面板 ── */
 .rp-title-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 
+/* 订阅状态 */
+.subscription-status {
+  margin: 10px 20px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.status-label {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-value.subscribed { color: #16a34a; }
+.status-value.not-subscribed { color: #dc2626; }
+.status-value.normal { color: #16a34a; }
+.status-value.low { color: #f97316; }
+.status-value.zero { color: #dc2626; }
+
+.renew-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.renew-btn {
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  background: #6366f1;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.renew-btn::after { border: none; }
+
+.renew-text {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .rp-empty {
   padding: 40px 0;
   display: flex;
@@ -574,7 +665,7 @@ onShow(async () => { await Promise.all([reloadAll(), loadReminders()]) })
   background: #ffffff;
   border-radius: 24px 24px 0 0;
   padding: 0 0 env(safe-area-inset-bottom);
-  max-height: 75vh;
+  max-height: calc(75vh - 60px);
   display: flex;
   flex-direction: column;
 }
@@ -609,8 +700,8 @@ onShow(async () => { await Promise.all([reloadAll(), loadReminders()]) })
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  /* 右侧略增内边距，避免贴边裁切（含安全区） */
-  padding: 0 calc(20px + env(safe-area-inset-right, 0px)) 16px 20px;
+  /* 底部padding：导航栏高度 + 安全区域 + 额外间距 */
+  padding: 0 calc(20px + env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom)) 20px;
 }
 
 /* ── 记录表单弹层 ── */
@@ -627,7 +718,7 @@ onShow(async () => { await Promise.all([reloadAll(), loadReminders()]) })
   width: 100%;
   background: #ffffff;
   border-radius: 24px 24px 0 0;
-  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  padding: 20px 20px calc(80px + env(safe-area-inset-bottom));
 }
 .modal-title {
   font-size: 18px;

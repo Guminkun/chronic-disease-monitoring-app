@@ -141,6 +141,7 @@ def create_medication_plan(
         notes=plan.notes,
         patient_disease_id=plan.patient_disease_id,
         is_temporary=plan.is_temporary,
+        remind_enabled=plan.remind_enabled,
         stock=plan.stock,
         paused_until=None
     )

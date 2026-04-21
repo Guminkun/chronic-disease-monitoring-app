@@ -235,7 +235,7 @@
               :value="t"
               @change="(e: any) => onEditTime(t, e)"
             >
-              <view class="time-chip" :class="{ readonly: times.length <= 1 }">
+              <view class="time-chip">
                 <text class="chip-time">{{ t }}</text>
                 <text 
                   v-if="times.length > 1" 
@@ -698,7 +698,6 @@ const onAddTime = (e: any) => {
   times.value = [...times.value, t].sort()
 }
 const onEditTime = (oldTime: string, e: any) => {
-  if (times.value.length <= 1) return
   const newTime = String(e.detail.value || '').trim()
   if (!newTime || newTime === oldTime) return
   if (times.value.includes(newTime)) {
@@ -1001,35 +1000,13 @@ onShow(() => {
   background: #eef2f7;
   display: flex;
   flex-direction: column;
-  padding-top: constant(safe-area-inset-top);
-  padding-top: env(safe-area-inset-top);
 }
-
-/* 导航栏 */
-
-
-
 
 /* 滚动内容 */
 .scroll-content {
   flex: 1;
-  padding: 24rpx 32rpx;
-  padding-top: calc(24rpx + constant(safe-area-inset-top));
-  padding-top: calc(24rpx + env(safe-area-inset-top));
-  box-sizing: border-box;
-}
-
-/* 导航栏 */
-
-
-
-
-
-
-/* 滚动内容 */
-.scroll-content {
-  flex: 1;
-  padding: 24rpx 32rpx;
+  padding: 12px 16px;
+  padding-top: calc(56px + 12px + env(safe-area-inset-top));
   box-sizing: border-box;
 }
 

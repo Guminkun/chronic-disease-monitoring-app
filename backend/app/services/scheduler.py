@@ -3,11 +3,12 @@
 集成到FastAPI服务中，随服务启动自动运行
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from ..database import SessionLocal
-from ..models import MedicationPlan, MedicationLog, User, WechatSubscription
+from ..models import MedicationPlan, MedicationLog, User, WechatSubscription, Reminder
 from ..services.wechat_service import wechat_service
+from ..config import settings
 from ..logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -106,15 +107,18 @@ class BackgroundScheduler:
                             logger.debug(f"用户不存在或无openid: plan_id={plan.id}")
                             continue
                         
-                        # 检查订阅状态
+                        # 检查订阅状态 - 使用用药提醒模板ID
+                        medication_template_id = settings.WECHAT_MEDICATION_TEMPLATE_ID
+                        
                         subscription = db.query(WechatSubscription).filter(
                             WechatSubscription.user_id == user.id,
+                            WechatSubscription.template_id == medication_template_id,
                             WechatSubscription.is_subscribed == True,
                             WechatSubscription.used_count < WechatSubscription.subscribe_count
                         ).first()
                         
                         if not subscription:
-                            logger.debug(f"用户订阅次数不足: user_id={user.id}")
+                            logger.info(f"用户未订阅用药提醒或订阅次数不足: user_id={user.id}, plan_id={plan.id}")
                             continue
                         
                         # 发送提醒
@@ -132,6 +136,16 @@ class BackgroundScheduler:
                         )
                         
                         if result.get("errcode") == 0:
+                            # 创建用药日志记录，防止重复发送
+                            new_log = MedicationLog(
+                                plan_id=plan.id,
+                                patient_id=plan.patient_id,
+                                member_id=plan.member_id,
+                                scheduled_time=scheduled_time,
+                                status="pending"
+                            )
+                            db.add(new_log)
+                            
                             # 更新订阅次数
                             subscription.used_count += 1
                             subscription.last_used_at = datetime.now()
@@ -161,20 +175,148 @@ class BackgroundScheduler:
         finally:
             db.close()
     
+    async def check_and_send_monitoring_reminders(self):
+        """检查并发送监测提醒"""
+        db = SessionLocal()
+        
+        try:
+            now = datetime.now()
+            today = now.date()
+            
+            # 查询需要发送的监测提醒
+            reminders = db.query(Reminder).filter(
+                Reminder.is_active == True,
+                Reminder.type == 'recheck'
+            ).all()
+            
+            for reminder in reminders:
+                if not reminder.schedule_text:
+                    continue
+                
+                # 解析提醒时间（格式：频率 时间，如"每天 08:00"）
+                parts = reminder.schedule_text.split()
+                if len(parts) < 2:
+                    continue
+                
+                time_str = parts[-1]  # 最后一部分是时间
+                freq = ' '.join(parts[:-1])  # 前面是频率
+                
+                try:
+                    hour, minute = map(int, time_str.split(":"))
+                    scheduled_time = datetime.combine(
+                        today,
+                        datetime.min.time().replace(hour=hour, minute=minute)
+                    )
+                    
+                    # 检查频率是否匹配
+                    if freq == '每天':
+                        is_due = True
+                    elif freq == '每两天':
+                        days_diff = (today - reminder.created_at.date()).days
+                        is_due = days_diff % 2 == 0
+                    elif freq == '每三天':
+                        days_diff = (today - reminder.created_at.date()).days
+                        is_due = days_diff % 3 == 0
+                    elif freq == '每周一次':
+                        is_due = today.weekday() == 0  # 周一
+                    elif freq == '每周两次':
+                        days_diff = (today - reminder.created_at.date()).days
+                        is_due = days_diff % 3 == 0 or days_diff % 3 == 3
+                    else:
+                        is_due = True
+                    
+                    if not is_due:
+                        continue
+                    
+                    # 提醒窗口：提前5分钟到准点
+                    reminder_window_start = scheduled_time - timedelta(minutes=5)
+                    reminder_window_end = scheduled_time
+                    
+                    if not (reminder_window_start <= now <= reminder_window_end):
+                        continue
+                    
+                    # 获取用户信息
+                    user = db.query(User).filter(
+                        User.id == reminder.patient.user_id
+                    ).first()
+                    
+                    if not user or not user.wechat_openid:
+                        logger.debug(f"用户不存在或无openid: reminder_id={reminder.id}")
+                        continue
+                    
+                    # 检查订阅状态 - 使用监测提醒模板ID
+                    monitoring_template_id = settings.WECHAT_MONITORING_TEMPLATE_ID
+                    
+                    subscription = db.query(WechatSubscription).filter(
+                        WechatSubscription.user_id == user.id,
+                        WechatSubscription.template_id == monitoring_template_id,
+                        WechatSubscription.is_subscribed == True,
+                        WechatSubscription.used_count < WechatSubscription.subscribe_count
+                    ).first()
+                    
+                    if not subscription:
+                        logger.info(f"用户未订阅监测提醒或订阅次数不足: user_id={user.id}, reminder_id={reminder.id}")
+                        continue
+                    
+                    # 发送监测提醒
+                    task_name = reminder.title
+                    task_time = scheduled_time.strftime("%Y-%m-%d %H:%M")
+                    remark = "请按时测量并记录数据"
+                    task_frequency = freq
+                    
+                    result = await wechat_service.send_monitoring_reminder(
+                        openid=user.wechat_openid,
+                        task_name=task_name,
+                        task_time=task_time,
+                        remark=remark,
+                        task_frequency=task_frequency
+                    )
+                    
+                    if result.get("errcode") == 0:
+                        # 更新订阅次数
+                        subscription.used_count += 1
+                        subscription.last_used_at = datetime.now()
+                        db.commit()
+                        
+                        logger.info(
+                            f"监测提醒发送成功: "
+                            f"reminder_id={reminder.id}, "
+                            f"user_id={user.id}, "
+                            f"title={task_name}, "
+                            f"time={task_time}"
+                        )
+                    else:
+                        logger.warning(
+                            f"监测提醒发送失败: "
+                            f"reminder_id={reminder.id}, "
+                            f"errcode={result.get('errcode')}, "
+                            f"errmsg={result.get('errmsg')}"
+                        )
+                
+                except Exception as e:
+                    logger.error(f"处理监测提醒失败: reminder_id={reminder.id}, error={e}")
+                    continue
+        
+        except Exception as e:
+            logger.error(f"检查监测提醒失败: {e}")
+        finally:
+            db.close()
+    
     async def run(self):
         """运行定时任务"""
-        logger.info("🕐 用药提醒定时任务已启动")
+        logger.info("🕐 用药和监测提醒定时任务已启动")
         self._running = True
         
         while self._running:
             try:
                 await self.check_and_send_reminders()
+                await self.check_and_send_monitoring_reminders()
             except Exception as e:
                 logger.error(f"定时任务执行出错: {e}")
             
             await asyncio.sleep(self.check_interval)
         
-        logger.info("🕐 用药提醒定时任务已停止")
+        logger.info("🕐 用药和监测提醒定时任务已停止")
     
     def start(self):
         """启动定时任务"""
@@ -199,11 +341,8 @@ class BackgroundScheduler:
             except asyncio.CancelledError:
                 pass
             
-        logger.info("✅ 用药提醒定时任务已停止")
+        logger.info("✅ 用药和监测提醒定时任务已停止")
 
 
 # 全局调度器实例
 scheduler = BackgroundScheduler()
-
-# 需要导入timedelta
-from datetime import timedelta

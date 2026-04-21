@@ -10,7 +10,8 @@ class WechatSubscriptionService:
     def __init__(self):
         self.appid = settings.WECHAT_APPID
         self.secret = settings.WECHAT_SECRET
-        self.template_id = getattr(settings, 'WECHAT_MEDICATION_TEMPLATE_ID', '')
+        self.medication_template_id = getattr(settings, 'WECHAT_MEDICATION_TEMPLATE_ID', '')
+        self.monitoring_template_id = getattr(settings, 'WECHAT_MONITORING_TEMPLATE_ID', '')
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
     
@@ -84,7 +85,7 @@ class WechatSubscriptionService:
         dosage: str,
         notes: str = ""
     ) -> Dict[str, Any]:
-        if not self.template_id:
+        if not self.medication_template_id:
             logger.error("WeChat medication template ID not configured")
             return {"errcode": -1, "errmsg": "Template ID not configured"}
         
@@ -99,7 +100,7 @@ class WechatSubscriptionService:
         
         payload = {
             "touser": openid,
-            "template_id": self.template_id,
+            "template_id": self.medication_template_id,
             "page": "pages/medication/index",
             "data": {
                 "time1": {"value": take_time},
@@ -123,6 +124,52 @@ class WechatSubscriptionService:
                 return result
         except Exception as e:
             logger.error(f"Error sending medication reminder: {e}")
+            return {"errcode": -1, "errmsg": str(e)}
+    
+    async def send_monitoring_reminder(
+        self,
+        openid: str,
+        task_name: str,
+        task_time: str,
+        remark: str,
+        task_frequency: str
+    ) -> Dict[str, Any]:
+        if not self.monitoring_template_id:
+            logger.error("WeChat monitoring template ID not configured")
+            return {"errcode": -1, "errmsg": "Template ID not configured"}
+        
+        access_token = await self.get_access_token()
+        if not access_token:
+            return {"errcode": -1, "errmsg": "Failed to get access token"}
+        
+        url = f"https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={access_token}"
+        
+        payload = {
+            "touser": openid,
+            "template_id": self.monitoring_template_id,
+            "page": "pages/monitor/index",
+            "data": {
+                "thing5": {"value": task_name[:20] if len(task_name) > 20 else task_name},
+                "time6": {"value": task_time},
+                "thing10": {"value": remark[:20] if remark else "请按时测量"},
+                "thing7": {"value": task_frequency[:20] if len(task_frequency) > 20 else task_frequency}
+            },
+            "miniprogram_state": "formal"
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload)
+                result = response.json()
+                
+                if result.get("errcode") == 0:
+                    logger.info(f"Monitoring reminder sent successfully to {openid}")
+                else:
+                    logger.warning(f"Failed to send monitoring reminder: {result}")
+                
+                return result
+        except Exception as e:
+            logger.error(f"Error sending monitoring reminder: {e}")
             return {"errcode": -1, "errmsg": str(e)}
     
     async def send_subscription_message(

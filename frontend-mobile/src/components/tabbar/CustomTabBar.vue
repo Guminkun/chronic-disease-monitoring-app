@@ -285,9 +285,6 @@ const handleQuickAdd = (type: string) => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.sheet-close text {
   font-size: 24rpx;
   color: #6b7280;
 }

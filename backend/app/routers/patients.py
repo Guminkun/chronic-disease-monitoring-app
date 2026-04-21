@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import UUID4
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from .. import crud, schemas, models, dependencies
 from ..binding_manager import manager as binding_manager
+from ..config import settings
+from ..services.wechat_service import wechat_service
 
 router = APIRouter(
     prefix="/patients",
@@ -898,4 +900,87 @@ async def upload_medical_record(
         "report_id": str(report.id),
         "fields": {k: v for k, v in medical_fields.items() if v},
         "message": "上传成功"
+    }
+
+# --- Monitoring Reminder Subscription Endpoints ---
+
+@router.get("/reminders/monitoring/subscribe-message")
+def get_monitoring_subscribe_message_template(
+    db: Session = Depends(dependencies.get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    template_id = settings.WECHAT_MONITORING_TEMPLATE_ID
+    
+    if not template_id:
+        return {
+            "template_id": "mock_monitoring_template_id_for_dev",
+            "template_name": "监测提醒通知（开发模式）",
+            "is_dev_mode": True
+        }
+    
+    return {
+        "template_id": template_id,
+        "template_name": "监测提醒通知"
+    }
+
+
+@router.post("/reminders/monitoring/confirm-subscription")
+async def confirm_monitoring_subscription(
+    subscription_data: schemas.WechatSubscriptionConfirm,
+    db: Session = Depends(dependencies.get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    openid = await wechat_service.get_openid_by_code(subscription_data.code)
+    if not openid:
+        raise HTTPException(status_code=400, detail="Failed to get openid from WeChat")
+    
+    existing = db.query(models.WechatSubscription).filter(
+        models.WechatSubscription.user_id == current_user.id,
+        models.WechatSubscription.template_id == subscription_data.template_id
+    ).first()
+    
+    if existing:
+        existing.is_subscribed = True
+        existing.subscribe_count += 1
+        existing.updated_at = datetime.now()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        new_subscription = models.WechatSubscription(
+            user_id=current_user.id,
+            openid=openid,
+            template_id=subscription_data.template_id,
+            is_subscribed=True,
+            subscribe_count=1,
+            used_count=0
+        )
+        db.add(new_subscription)
+        db.commit()
+        db.refresh(new_subscription)
+        return new_subscription
+
+
+@router.get("/reminders/monitoring/subscription-status")
+def get_monitoring_subscription_status(
+    db: Session = Depends(dependencies.get_db),
+    current_user: models.User = Depends(dependencies.get_current_active_user)
+):
+    template_id = settings.WECHAT_MONITORING_TEMPLATE_ID
+    
+    subscription = db.query(models.WechatSubscription).filter(
+        models.WechatSubscription.user_id == current_user.id,
+        models.WechatSubscription.template_id == template_id
+    ).first()
+    
+    if not subscription:
+        return {
+            "is_subscribed": False,
+            "remaining_count": 0
+        }
+    
+    remaining = subscription.subscribe_count - subscription.used_count
+    return {
+        "is_subscribed": subscription.is_subscribed and remaining > 0,
+        "remaining_count": max(0, remaining)
     }
