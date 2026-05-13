@@ -30,3 +30,10 @@ export function getCategories() {
         method: 'get'
     })
 }
+
+export function deleteArticle(id: number) {
+    return request({
+        url: `/education/articles/${id}`,
+        method: 'delete'
+    })
+}

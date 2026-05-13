@@ -11,6 +11,9 @@ import json
 from .. import models, schemas
 from ..database import get_db
 from ..services.minio_service import minio_service
+from ..logging_config import get_logger
+from ..config import settings
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/usage-guides",
@@ -175,16 +178,16 @@ async def upload_image(
             file_content, 
             "system",
             "guides",
-            "usageguides",
+            settings.MINIO_BUCKET_GUIDES,
             file.content_type or "image/jpeg",
-            bucket_name="usageguides"
+            bucket_name=settings.MINIO_BUCKET_GUIDES
         )
-        url = minio_service.get_presigned_url(file_key, bucket_name="usageguides")
+        url = minio_service.get_presigned_url(file_key, bucket_name=settings.MINIO_BUCKET_GUIDES)
         return {"url": url, "filename": file_key}
     except Exception as e:
-        print(f"图片上传失败: {e}")
+        logger.error(f"图片上传失败: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"图片上传失败: {str(e)}")
 
 
@@ -212,17 +215,17 @@ async def upload_video(
             file_content, 
             "system",
             "guides",
-            "usageguides",
+            settings.MINIO_BUCKET_GUIDES,
             file.content_type or "video/mp4",
-            bucket_name="usageguides",
+            bucket_name=settings.MINIO_BUCKET_GUIDES,
             compress=False
         )
-        url = minio_service.get_presigned_url(file_key, bucket_name="usageguides")
+        url = minio_service.get_presigned_url(file_key, bucket_name=settings.MINIO_BUCKET_GUIDES)
         return {"url": url, "filename": file_key}
     except Exception as e:
-        print(f"视频上传失败: {e}")
+        logger.error(f"视频上传失败: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"视频上传失败: {str(e)}")
 
 

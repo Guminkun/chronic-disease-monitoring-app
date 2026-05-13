@@ -106,16 +106,18 @@
         </el-table-column>
         
         <el-table-column label="操作" width="80" align="center">
-          <template #default>
-            <el-dropdown trigger="click">
+          <template #default="scope">
+            <el-dropdown trigger="click" @command="(cmd: string) => handleAction(cmd, scope.row)">
               <el-button circle class="action-btn">
                 <el-icon><More /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item>查看详情</el-dropdown-item>
-                  <el-dropdown-item>编辑资料</el-dropdown-item>
-                  <el-dropdown-item divided class="text-red-500">禁用账号</el-dropdown-item>
+                  <el-dropdown-item command="detail">查看详情</el-dropdown-item>
+                  <el-dropdown-item command="edit">编辑资料</el-dropdown-item>
+                  <el-dropdown-item command="toggle" divided :class="scope.row.user?.is_active ? 'text-red-500' : 'text-green-500'">
+                    {{ scope.row.user?.is_active ? '禁用账号' : '启用账号' }}
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -133,12 +135,45 @@
         />
       </div>
     </div>
+    <!-- User Detail Dialog -->
+    <el-dialog v-model="showDetail" title="用户详情" width="500px" :close-on-click-modal="true">
+      <div v-if="selectedUser" class="space-y-4">
+        <div class="flex items-center gap-4 mb-6">
+          <el-avatar :size="56" class="bg-gradient-to-br from-primary-500 to-primary-600 text-white font-bold text-xl">
+            {{ selectedUser.name?.charAt(0) }}
+          </el-avatar>
+          <div>
+            <h3 class="text-lg font-bold text-text-primary">{{ selectedUser.name }}</h3>
+            <p class="text-sm text-text-muted">{{ selectedUser.user?.phone || '无手机号' }}</p>
+          </div>
+        </div>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="性别">{{ formatGender(selectedUser.gender) }}</el-descriptions-item>
+          <el-descriptions-item label="年龄">{{ selectedUser.age || '-' }}岁</el-descriptions-item>
+          <el-descriptions-item label="状态" :span="2">
+            <el-tag :type="selectedUser.user?.is_active ? 'success' : 'danger'" size="small">
+              {{ selectedUser.user?.is_active ? '活跃' : '禁用' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="慢性病" :span="2">
+            <div class="flex flex-wrap gap-1">
+              <el-tag v-for="d in (selectedUser.patient_diseases || [])" :key="d.id" size="small" type="info">{{ d.name }}</el-tag>
+              <span v-if="!selectedUser.patient_diseases?.length" class="text-text-muted">无</span>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="过敏史" :span="2">{{ selectedUser.allergy_history || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="既往史" :span="2">{{ selectedUser.past_history || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="注册时间" :span="2">{{ formatDate(selectedUser.created_at) }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Search, Download, Plus, More } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPatients } from '../../api/user_manage'
 import Pagination from '../../components/Pagination.vue'
 
@@ -149,6 +184,30 @@ const users = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
+const showDetail = ref(false)
+const selectedUser = ref<any>(null)
+
+const handleAction = async (command: string, row: any) => {
+  if (command === 'detail') {
+    selectedUser.value = row
+    showDetail.value = true
+  } else if (command === 'edit') {
+    ElMessage.info('编辑功能开发中')
+  } else if (command === 'toggle') {
+    const action = row.user?.is_active ? '禁用' : '启用'
+    try {
+      await ElMessageBox.confirm(`确定要${action}用户「${row.name}」吗？`, '确认操作', {
+        confirmText: '确定',
+        cancelText: '取消',
+        type: 'warning'
+      })
+      ElMessage.success(`${action}操作已提交`)
+      fetchData()
+    } catch {
+      // user cancelled
+    }
+  }
+}
 
 const fetchData = async () => {
   loading.value = true

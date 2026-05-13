@@ -26,12 +26,13 @@ export const uploadReport = (data: any) => {
 export const parseReport = (filePath: string, formData: any = {}) => {
     return new Promise((resolve, reject) => {
         const token = uni.getStorageSync('token')
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
         let url = `${BASE_URL}/reports/parse`
         // #ifdef MP-WEIXIN
-        url = 'http://127.0.0.1:8000/reports/parse'
+        url = `${apiBase}/reports/parse`
         // #endif
         // #ifdef APP-PLUS
-        url = 'http://192.168.1.100:8000/reports/parse'
+        url = `${apiBase}/reports/parse`
         // #endif
         uni.uploadFile({
             url,
@@ -86,12 +87,13 @@ export const parseReport = (filePath: string, formData: any = {}) => {
 export const parseImagingReport = (filePath: string, formData: any = {}) => {
     return new Promise((resolve, reject) => {
         const token = uni.getStorageSync('token')
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
         let url = `${BASE_URL}/reports/parse-imaging`
         // #ifdef MP-WEIXIN
-        url = 'http://127.0.0.1:8000/reports/parse-imaging'
+        url = `${apiBase}/reports/parse-imaging`
         // #endif
         // #ifdef APP-PLUS
-        url = 'http://192.168.1.100:8000/reports/parse-imaging'
+        url = `${apiBase}/reports/parse-imaging`
         // #endif
         uni.uploadFile({
             url,
@@ -174,12 +176,13 @@ export const getTrends = (params?: { report_type?: string, metric_names?: string
 export const autoClassifyReport = (filePath: string, formData: any = {}) => {
     return new Promise((resolve, reject) => {
         const token = uni.getStorageSync('token')
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
         let url = `${BASE_URL}/reports/auto-classify`
         // #ifdef MP-WEIXIN
-        url = 'http://127.0.0.1:8000/reports/auto-classify'
+        url = `${apiBase}/reports/auto-classify`
         // #endif
         // #ifdef APP-PLUS
-        url = 'http://192.168.1.100:8000/reports/auto-classify'
+        url = `${apiBase}/reports/auto-classify`
         // #endif
         uni.uploadFile({
             url,

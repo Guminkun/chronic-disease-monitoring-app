@@ -189,15 +189,16 @@ def update_db():
                 print("Added medication_plans.stock column")
             except Exception as e:
                 print(f"Error adding medication_plans.stock: {e}")
+        
+        if "remind_enabled" not in mp_columns:
+            try:
+                conn.execute(text("ALTER TABLE medication_plans ADD COLUMN remind_enabled BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+                print("Added medication_plans.remind_enabled column")
+            except Exception as e:
+                print(f"Error adding medication_plans.remind_enabled: {e}")
 
-        # ========== medications 表：清空并重建新字段结构 ==========
-        try:
-            conn.execute(text("DELETE FROM medications"))
-            conn.commit()
-            print("Cleared medications table")
-        except Exception as e:
-            print(f"Error clearing medications: {e}")
-
+        # ========== medications 表：添加新字段（不清空数据） ==========
         # 检查并添加 medications 表新字段
         med_columns = [c["name"] for c in inspector.get_columns("medications")]
         new_med_columns = [

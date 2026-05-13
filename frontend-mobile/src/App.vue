@@ -5,7 +5,7 @@ import { useUserStore } from "@/stores/user";
 const userStore = useUserStore();
 
 onLaunch(() => {
-  console.log("App Launch");
+  if (import.meta.env.DEV) console.log("App Launch");
   // #ifdef MP-WEIXIN
   // 微信小程序环境：自动检查登录状态
   autoLoginIfNeeded();
@@ -20,7 +20,7 @@ const autoLoginIfNeeded = async () => {
     try {
       await userStore.fetchUserInfo();
     } catch (e) {
-      console.log('Failed to fetch user info, token may be expired');
+      if (import.meta.env.DEV) console.log('Failed to fetch user info, token may be expired');
       uni.removeStorageSync('token');
     }
     return;
@@ -31,7 +31,7 @@ const autoLoginIfNeeded = async () => {
   if (hasLoggedInBefore) {
     try {
       await userStore.loginByWechat();
-      console.log('Auto login succeeded');
+      if (import.meta.env.DEV) console.log('Auto login succeeded');
     } catch (e) {
       console.log('Auto login failed:', e);
       // 自动登录失败，清除标记
@@ -41,11 +41,11 @@ const autoLoginIfNeeded = async () => {
 };
 
 onShow(() => {
-  console.log("App Show");
+  if (import.meta.env.DEV) console.log("App Show");
 });
 
 onHide(() => {
-  console.log("App Hide");
+  if (import.meta.env.DEV) console.log("App Hide");
 });
 </script>
 <style>
@@ -79,5 +79,24 @@ onHide(() => {
   --pill-med-fg: #3b82f6;
   --pill-recheck-bg: #fdf2f8;
   --pill-recheck-fg: #ec4899;
+
+  /* 中老年适配 - 字号与触控区域 */
+  --font-size-xs: 24rpx;
+  --font-size-sm: 26rpx;
+  --font-size-base: 30rpx;
+  --font-size-lg: 34rpx;
+  --font-size-xl: 38rpx;
+  --min-touch-target: 88rpx;
+}
+
+/* 中老年适配 - 全局最小触控区域 */
+button, .btn, [role="button"] {
+  min-height: var(--min-touch-target);
+}
+
+/* 中老年适配 - 全局输入框 */
+input, textarea {
+  font-size: var(--font-size-base) !important;
+  min-height: var(--min-touch-target);
 }
 </style>

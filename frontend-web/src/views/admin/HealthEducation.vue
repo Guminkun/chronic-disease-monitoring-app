@@ -105,7 +105,7 @@
                   <el-dropdown-item @click="togglePublish(scope.row)">
                     {{ scope.row.is_published ? '下架' : '发布' }}
                   </el-dropdown-item>
-                  <el-dropdown-item divided class="text-red-500">删除</el-dropdown-item>
+                  <el-dropdown-item divided class="text-red-500" @click="handleDelete(scope.row)">删除</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -179,8 +179,8 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
 import { Search, Plus, More, Reading } from '@element-plus/icons-vue'
-import { getArticles, getCategories, createArticle, updateArticle } from '../../api/education_manage'
-import { ElMessage } from 'element-plus'
+import { getArticles, getCategories, createArticle, updateArticle, deleteArticle } from '../../api/education_manage'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Pagination from '../../components/Pagination.vue'
 
 const searchQuery = ref('')
@@ -268,6 +268,23 @@ const togglePublish = async (row: any) => {
     fetchData()
   } catch (e) {
     ElMessage.error('操作失败')
+  }
+}
+
+const handleDelete = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除文章「${row.title}」吗？此操作不可恢复。`, '确认删除', {
+      confirmText: '删除',
+      cancelText: '取消',
+      type: 'warning'
+    })
+    await deleteArticle(row.id)
+    ElMessage.success('删除成功')
+    fetchData()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
   }
 }
 

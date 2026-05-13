@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from .. import models, schemas, dependencies, crud
 from ..database import get_db
 from ..services.notification_service import notification_service
@@ -196,7 +196,7 @@ def mark_as_read(
         raise HTTPException(status_code=404, detail="通知不存在")
     
     notification.is_read = True
-    notification.read_at = datetime.utcnow()
+    notification.read_at = datetime.now(timezone.utc)
     db.commit()
     
     return {"message": "已标记为已读"}
@@ -237,7 +237,7 @@ def mark_all_as_read(
     
     query.update({
         models.Notification.is_read: True,
-        models.Notification.read_at: datetime.utcnow()
+        models.Notification.read_at: datetime.now(timezone.utc)
     })
     
     db.commit()
@@ -336,7 +336,7 @@ def mark_notification_as_handled(
         raise HTTPException(status_code=404, detail="通知不存在")
     
     notification.is_handled = True
-    notification.handled_at = datetime.utcnow()
+    notification.handled_at = datetime.now(timezone.utc)
     notification.handler_type = handler_type
     
     db.commit()
@@ -383,7 +383,7 @@ def mark_all_notifications_as_handled(
     
     query.update({
         models.Notification.is_handled: True,
-        models.Notification.handled_at: datetime.utcnow(),
+        models.Notification.handled_at: datetime.now(timezone.utc),
         models.Notification.handler_type: "user"
     }, synchronize_session=False)
     

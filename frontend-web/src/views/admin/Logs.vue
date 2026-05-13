@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
     <div class="flex justify-between items-center">
       <div>
         <h2 class="text-2xl font-bold text-gray-900">系统日志</h2>
@@ -9,9 +8,7 @@
       <el-button type="primary" class="!bg-primary" icon="Download">导出日志</el-button>
     </div>
 
-    <!-- Main Content -->
     <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <!-- Filters -->
       <div class="p-6 border-b border-gray-100 flex gap-4 items-center">
         <div class="relative flex-1 max-w-lg">
           <el-input
@@ -19,20 +16,27 @@
             placeholder="搜索用户、操作内容..."
             prefix-icon="Search"
             clearable
+            @clear="fetchLogs"
+            @keyup.enter="fetchLogs"
           />
         </div>
-        <el-select v-model="filterType" placeholder="全部类型" class="w-32">
+        <el-select v-model="filterAction" placeholder="全部类型" class="w-32" clearable @change="fetchLogs">
           <el-option label="全部类型" value="" />
-          <el-option label="讲座" value="lecture" />
-          <el-option label="阅读" value="read" />
-          <el-option label="发布" value="publish" />
-          <el-option label="编辑" value="edit" />
+          <el-option label="用户登录" value="login" />
+          <el-option label="上传报告" value="create_report" />
+          <el-option label="删除报告" value="delete_report" />
+          <el-option label="导出数据" value="export_data" />
+          <el-option label="注销账号" value="delete_account" />
+          <el-option label="创建用药" value="create_medication_plan" />
         </el-select>
-        <el-button icon="Filter">更多筛选</el-button>
       </div>
 
-      <!-- Table -->
-      <el-table :data="logs" style="width: 100%" :header-cell-style="{ background: '#F8FAFC', color: '#64748B' }">
+      <el-table
+        :data="logs"
+        style="width: 100%"
+        :header-cell-style="{ background: '#F8FAFC', color: '#64748B' }"
+        v-loading="loading"
+      >
         <el-table-column prop="time" label="时间" width="180" />
         <el-table-column prop="user" label="用户" width="150">
           <template #default="scope">
@@ -55,12 +59,12 @@
         <el-table-column prop="ip" label="IP地址" width="140" />
       </el-table>
 
-      <!-- Pagination -->
       <div class="p-6 border-t border-gray-100">
         <Pagination
           v-model:currentPage="currentPage"
           v-model:pageSize="pageSize"
-          :total="logs.length"
+          :total="total"
+          @change="fetchLogs"
         />
       </div>
     </div>
@@ -68,69 +72,52 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Pagination from '../../components/Pagination.vue'
+import request from '../../utils/request'
 
 const searchQuery = ref('')
-const filterType = ref('')
+const filterAction = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const loading = ref(false)
+const logs = ref<any[]>([])
+const total = ref(0)
 
-const logs = ref([
-  {
-    time: '2026-01-28 15:30:45',
-    user: '医生 · 王明',
-    action: '查看未有学时的研读课程',
-    type: 'lecture',
-    typeText: '讲座',
-    status: 'success',
-    ip: '192.168.1.100'
-  },
-  {
-    time: '2026-01-28 15:28:12',
-    user: '患者 · 李明',
-    action: '上传检查报告 (血常规)',
-    type: 'read',
-    typeText: '阅读',
-    status: 'success',
-    ip: '192.168.1.101'
-  },
-  {
-    time: '2026-01-28 15:25:30',
-    user: '管理员 · 系统',
-    action: '批准医生张红的注册申请',
-    type: 'publish',
-    typeText: '发布',
-    status: 'success',
-    ip: '192.168.1.102'
-  },
-  {
-    time: '2026-01-28 15:20:15',
-    user: '医生 · 李华',
-    action: '创建患者王建的诊疗记录',
-    type: 'read',
-    typeText: '阅读',
-    status: 'success',
-    ip: '192.168.1.103'
-  },
-  {
-    time: '2026-01-28 15:15:00',
-    user: '患者 · 王建',
-    action: '修改个人信息 (电话号码)',
-    type: 'publish',
-    typeText: '发布',
-    status: 'success',
-    ip: '192.168.1.104'
+const fetchLogs = async () => {
+  loading.value = true
+  try {
+    const res: any = await request({
+      url: '/dashboard/logs',
+      method: 'get',
+      params: {
+        skip: (currentPage.value - 1) * pageSize.value,
+        limit: pageSize.value,
+        action: filterAction.value || undefined,
+        q: searchQuery.value || undefined
+      }
+    })
+    logs.value = res.items || []
+    total.value = res.total || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
   }
-])
+}
 
 const getTypeTag = (type: string) => {
   const map: Record<string, string> = {
     'lecture': 'success',
     'read': 'primary',
     'publish': 'warning',
-    'edit': 'info'
+    'edit': 'info',
+    'info': 'info'
   }
   return map[type] || 'info'
 }
+
+onMounted(() => {
+  fetchLogs()
+})
 </script>

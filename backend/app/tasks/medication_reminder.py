@@ -23,6 +23,7 @@ def get_medication_tasks_for_reminder(db: Session, reminder_time: datetime) -> L
     
     plans = db.query(MedicationPlan).filter(
         MedicationPlan.is_active == True,
+        MedicationPlan.remind_enabled == True,
         MedicationPlan.start_date <= today,
     ).all()
     

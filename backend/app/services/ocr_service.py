@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.config import settings
+from ..logging_config import get_logger
+logger = get_logger(__name__)
 
 try:
     from bs4 import BeautifulSoup  # type: ignore
@@ -59,7 +61,7 @@ async def _submit_job(client: httpx.AsyncClient, file_content: bytes, filename: 
     if resp.status_code != 200:
         raise Exception(f"OCR Job 提交失败: {resp.status_code} - {resp.text}")
     job_id = resp.json()["data"]["jobId"]
-    print(f"[OCR] Job 提交成功，jobId={job_id}")
+    logger.info(f"[OCR] Job 提交成功，jobId={job_id}")
     return job_id
 
 
@@ -77,18 +79,18 @@ async def _poll_job(client: httpx.AsyncClient, job_id: str) -> str:
         data = resp.json()["data"]
         state = data["state"]
         if state == "pending":
-            print(f"[OCR] jobId={job_id} 状态: pending ({elapsed}s)")
+            logger.info(f"[OCR] jobId={job_id} 状态: pending ({elapsed}s)")
         elif state == "running":
             prog = data.get("extractProgress", {})
-            print(f"[OCR] jobId={job_id} 运行中: {prog.get('extractedPages', '?')}/{prog.get('totalPages', '?')} 页 ({elapsed}s)")
+            logger.info(f"[OCR] jobId={job_id} 运行中: {prog.get('extractedPages', '?')}/{prog.get('totalPages', '?')} 页 ({elapsed}s)")
         elif state == "done":
             jsonl_url = data["resultUrl"]["jsonUrl"]
-            print(f"[OCR] jobId={job_id} 完成，结果地址: {jsonl_url}")
+            logger.info(f"[OCR] jobId={job_id} 完成，结果地址: {jsonl_url}")
             return jsonl_url
         elif state == "failed":
             raise Exception(f"OCR Job 失败: {data.get('errorMsg', '未知错误')}")
         else:
-            print(f"[OCR] jobId={job_id} 未知状态: {state}")
+            logger.warning(f"[OCR] jobId={job_id} 未知状态: {state}")
     raise Exception(f"OCR Job 超时（>{_MAX_WAIT}s），jobId={job_id}")
 
 
@@ -234,7 +236,7 @@ def extract_medical_fields(summary: str) -> Dict[str, Any]:
 
 async def parse_report_file(file_content: bytes, filename: str) -> Dict[str, Any]:
     """解析报告文件，返回含 summary + metrics + basic_info 的字典。"""
-    print(f"[OCR] 开始解析: {filename} ({len(file_content)} bytes)")
+    logger.info(f"[OCR] 开始解析: {filename} ({len(file_content)} bytes)")
     summary = await _run_ocr_job(file_content, filename)
     today = datetime.date.today().strftime("%Y-%m-%d")
     
@@ -351,7 +353,7 @@ def extract_imaging_findings_and_diagnosis(summary: str) -> tuple[str, str]:
 
 async def parse_report_text_only(file_content: bytes, filename: str) -> Dict[str, Any]:
     """仅提取纯文本（影像报告用）。"""
-    print(f"[OCR] 纯文本解析: {filename}")
+    logger.info(f"[OCR] 纯文本解析: {filename}")
     summary = await _run_ocr_job(file_content, filename)
     today = datetime.date.today().strftime("%Y-%m-%d")
     text = extract_text_only(summary)
@@ -495,7 +497,7 @@ def extract_field_value(field_name: str, text: str, matched_keyword: str) -> str
                 
                 if value and len(value) < 100 and value != matched_keyword:
                     return value
-        except:
+        except Exception:
             continue
     
     return ""
@@ -586,7 +588,7 @@ def extract_metrics_and_info_from_html(html_text: str) -> tuple[List[Dict[str, A
             
             return metrics, basic_info
         except Exception as e:
-            print(f"Error parsing HTML: {e}")
+            logger.error(f"Error parsing HTML: {e}")
             pass
 
     def strip_tags(s: str) -> str:

@@ -7,6 +7,7 @@ from .. import crud, schemas, models, dependencies
 from ..binding_manager import manager as binding_manager
 from ..config import settings
 from ..services.wechat_service import wechat_service
+from ..services.audit_service import log_action
 
 router = APIRouter(
     prefix="/patients",
@@ -867,7 +868,7 @@ async def upload_medical_record(
             date_str = medical_fields['report_date']
             date_str = date_str.replace('年', '-').replace('月', '-').replace('日', '')
             report_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-        except:
+        except (ValueError, TypeError):
             pass
     
     report_data = {
@@ -984,3 +985,87 @@ def get_monitoring_subscription_status(
         "is_subscribed": subscription.is_subscribed and remaining > 0,
         "remaining_count": max(0, remaining)
     }
+
+
+@router.get("/export-data", summary="导出用户数据")
+def export_user_data(
+    current_user: models.User = Depends(dependencies.get_current_active_user),
+    db: Session = Depends(dependencies.get_db)
+):
+    """导出当前用户的所有个人数据（个人信息保护法/数据可携带权）"""
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="未找到患者档案")
+
+    diseases = db.query(models.PatientDisease).filter(models.PatientDisease.patient_id == patient.id).all()
+    reports = db.query(models.Report).filter(models.Report.patient_id == patient.id).all()
+    readings = db.query(models.HealthReading).filter(models.HealthReading.patient_id == patient.id).all()
+    plans = db.query(models.MedicationPlan).filter(models.MedicationPlan.patient_id == patient.id).all()
+    members = db.query(models.Member).filter(models.Member.patient_id == patient.id).all()
+
+    def _ser(obj, exclude=None):
+        exclude = exclude or set()
+        d = {}
+        for c in obj.__table__.columns:
+            if c.name in exclude:
+                continue
+            val = getattr(obj, c.name)
+            if isinstance(val, (datetime, date)):
+                val = val.isoformat()
+            elif hasattr(val, 'value'):
+                val = val.value
+            elif isinstance(val, uuid.UUID):
+                val = str(val)
+            d[c.name] = val
+        return d
+
+    log_action(db, user_id=current_user.id, action="export_data", resource="patients")
+
+    return {
+        "export_date": datetime.now().isoformat(),
+        "user": _ser(current_user, exclude={"password_hash"}),
+        "patient_profile": _ser(patient),
+        "diseases": [_ser(d) for d in diseases],
+        "reports": [_ser(r) for r in reports],
+        "health_readings": [_ser(r) for r in readings],
+        "medication_plans": [_ser(p) for p in plans],
+        "members": [_ser(m) for m in members],
+    }
+
+
+@router.post("/delete-account", summary="注销账号")
+def delete_account(
+    current_user: models.User = Depends(dependencies.get_current_active_user),
+    db: Session = Depends(dependencies.get_db)
+):
+    """注销当前用户账号，删除所有个人数据（不可逆操作）"""
+    patient = crud.get_patient_by_user_id(db, user_id=current_user.id)
+    if patient:
+        db.query(models.Member).filter(models.Member.patient_id == patient.id).delete()
+        db.query(models.HealthReading).filter(models.HealthReading.patient_id == patient.id).delete()
+        db.query(models.MedicationLog).filter(
+            models.MedicationLog.plan_id.in_(
+                db.query(models.MedicationPlan.id).filter(models.MedicationPlan.patient_id == patient.id)
+            )
+        ).delete(synchronize_session=False)
+        db.query(models.MedicationPlan).filter(models.MedicationPlan.patient_id == patient.id).delete()
+        db.query(models.ReportMetric).filter(
+            models.ReportMetric.report_id.in_(
+                db.query(models.Report.id).filter(models.Report.patient_id == patient.id)
+            )
+        ).delete(synchronize_session=False)
+        db.query(models.Report).filter(models.Report.patient_id == patient.id).delete()
+        db.query(models.PatientDisease).filter(models.PatientDisease.patient_id == patient.id).delete()
+        db.query(models.Reminder).filter(models.Reminder.patient_id == patient.id).delete()
+        db.query(models.Notification).filter(models.Notification.patient_id == patient.id).delete()
+        db.query(models.Patient).filter(models.Patient.id == patient.id).delete()
+
+    db.query(models.SystemLog).filter(models.SystemLog.user_id == current_user.id).delete()
+    current_user.is_active = False
+    current_user.phone = None
+    current_user.wechat_openid = None
+    db.commit()
+
+    log_action(db, user_id=current_user.id, action="delete_account", resource="patients")
+
+    return {"message": "账号已注销，所有数据已删除"}

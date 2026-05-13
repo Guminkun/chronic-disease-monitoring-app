@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
 from datetime import date, datetime, timedelta
@@ -9,6 +9,9 @@ from .. import models, schemas, crud, dependencies
 from ..database import get_db
 from ..config import settings
 from ..services.wechat_service import wechat_service
+from ..logging_config import get_logger
+logger = get_logger(__name__)
+from ..services.audit_service import log_action
 
 router = APIRouter(
     prefix="/medications",
@@ -158,6 +161,9 @@ def create_medication_plan(
     db.add(db_plan)
     db.commit()
     db.refresh(db_plan)
+
+    log_action(db, user_id=current_user.id, action="create_medication_plan", resource="medications")
+
     return db_plan
 
 @router.get("/daily", response_model=List[schemas.DailyMedicationTask])
@@ -221,7 +227,7 @@ def get_daily_medication_tasks(
                 days_diff = (query_date - plan.start_date).days
                 if days_diff >= 0 and days_diff % (interval + 1) == 0: # interval=1 means every 2 days
                     is_due = True
-            except:
+            except (ValueError, TypeError):
                 pass
         elif plan.frequency_type == "specific_days":
             # "1,3,5" -> Mon, Wed, Fri
@@ -229,7 +235,7 @@ def get_daily_medication_tasks(
                 weekday = query_date.weekday() + 1 # 1-7
                 if str(weekday) in (plan.frequency_value or "").split(","):
                     is_due = True
-            except:
+            except (ValueError, TypeError):
                 pass
                 
         if is_due:
@@ -265,7 +271,7 @@ def get_daily_medication_tasks(
             dt_str = f"{date_str} {time_str}"
             try:
                 sched_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError):
                 continue
             
             # Key for map lookup
@@ -623,7 +629,8 @@ def get_medication_history(
     # 只返回已完成的记录（taken 或 skipped）
     query = query.filter(models.MedicationLog.status.in_(["taken", "skipped"]))
     
-    # 排序和分页
+    # 排序和分页 — 使用 joinedload 预加载 plan 避免 N+1
+    query = query.options(joinedload(models.MedicationLog.plan))
     query = query.order_by(models.MedicationLog.scheduled_time.desc())
     total = query.count()
     logs = query.offset(skip).limit(limit).all()
@@ -631,9 +638,7 @@ def get_medication_history(
     # 组装结果
     results = []
     for log in logs:
-        plan = db.query(models.MedicationPlan).filter(
-            models.MedicationPlan.id == log.plan_id
-        ).first()
+        plan = log.plan
         
         results.append({
             "id": log.id,
@@ -725,15 +730,15 @@ def get_available_makeup_tasks(
                 days_diff_plan = (query_date - plan.start_date).days
                 if days_diff_plan >= 0 and days_diff_plan % (interval + 1) == 0:
                     is_due = True
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"解析interval频率失败: {e}")
         elif plan.frequency_type == "specific_days":
             try:
                 weekday = query_date.weekday() + 1
                 if str(weekday) in (plan.frequency_value or "").split(","):
                     is_due = True
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"解析specific_days频率失败: {e}")
         
         if is_due:
             active_plans.append(plan)
@@ -762,7 +767,8 @@ def get_available_makeup_tasks(
             dt_str = f"{date_str} {time_str}"
             try:
                 sched_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-            except:
+            except Exception as e:
+                logger.error(f"解析服药时间失败: {dt_str}, error={e}")
                 continue
             
             log = log_map.get((plan.id, time_str))
@@ -894,16 +900,14 @@ def get_makeup_history(
     query = db.query(models.MedicationLog).filter(
         models.MedicationLog.plan_id.in_(plan_ids),
         models.MedicationLog.is_makeup == True
-    ).order_by(models.MedicationLog.created_at.desc())
+    ).options(joinedload(models.MedicationLog.plan)).order_by(models.MedicationLog.created_at.desc())
     
     total = query.count()
     logs = query.offset(skip).limit(limit).all()
     
     results = []
     for log in logs:
-        plan = db.query(models.MedicationPlan).filter(
-            models.MedicationPlan.id == log.plan_id
-        ).first()
+        plan = log.plan
         
         reason_label = {
             "forgot": "忘记服药",

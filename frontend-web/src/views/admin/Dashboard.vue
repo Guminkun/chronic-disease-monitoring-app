@@ -26,7 +26,9 @@
           <div class="p-3 rounded-xl bg-primary-100 text-primary-600 group-hover:scale-110 transition-transform">
             <el-icon class="text-2xl"><User /></el-icon>
           </div>
-          <span class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">+12%</span>
+          <span v-if="stats.total_users_change" class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">
+            {{ stats.total_users_change > 0 ? '+' : '' }}{{ stats.total_users_change }}%
+          </span>
         </div>
         <h3 class="text-3xl font-bold text-text-primary mb-1">{{ stats.total_users }}</h3>
         <p class="text-sm text-text-muted">总用户数</p>
@@ -38,7 +40,9 @@
           <div class="p-3 rounded-xl bg-blue-100 text-blue-600 group-hover:scale-110 transition-transform">
             <el-icon class="text-2xl"><UserFilled /></el-icon>
           </div>
-          <span class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">+8%</span>
+          <span v-if="stats.active_users_change" class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">
+            {{ stats.active_users_change > 0 ? '+' : '' }}{{ stats.active_users_change }}%
+          </span>
         </div>
         <h3 class="text-3xl font-bold text-text-primary mb-1">{{ stats.active_users }}</h3>
         <p class="text-sm text-text-muted">活跃用户</p>
@@ -50,7 +54,9 @@
           <div class="p-3 rounded-xl bg-amber-100 text-amber-600 group-hover:scale-110 transition-transform">
             <el-icon class="text-2xl"><Calendar /></el-icon>
           </div>
-          <span class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">+3</span>
+          <span v-if="stats.today_revisits_change" class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">
+            {{ stats.today_revisits_change > 0 ? '+' : '' }}{{ stats.today_revisits_change }}
+          </span>
         </div>
         <h3 class="text-3xl font-bold text-text-primary mb-1">{{ stats.today_revisits }}</h3>
         <p class="text-sm text-text-muted">今日复诊</p>
@@ -62,7 +68,9 @@
           <div class="p-3 rounded-xl bg-rose-100 text-rose-600 group-hover:scale-110 transition-transform">
             <el-icon class="text-2xl"><Document /></el-icon>
           </div>
-          <span class="text-xs font-semibold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">-2</span>
+          <span v-if="stats.pending_reports_change" class="text-xs font-semibold text-red-600 bg-red-100 px-2.5 py-1 rounded-full">
+            {{ stats.pending_reports_change > 0 ? '+' : '' }}{{ stats.pending_reports_change }}
+          </span>
         </div>
         <h3 class="text-3xl font-bold text-text-primary mb-1">{{ stats.pending_reports }}</h3>
         <p class="text-sm text-text-muted">待处理报告</p>
@@ -74,7 +82,9 @@
           <div class="p-3 rounded-xl bg-green-100 text-green-600 group-hover:scale-110 transition-transform">
             <el-icon class="text-2xl"><TrendCharts /></el-icon>
           </div>
-          <span class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">+15%</span>
+          <span v-if="stats.new_users_month_change" class="text-xs font-semibold text-green-600 bg-green-100 px-2.5 py-1 rounded-full">
+            {{ stats.new_users_month_change > 0 ? '+' : '' }}{{ stats.new_users_month_change }}%
+          </span>
         </div>
         <h3 class="text-3xl font-bold text-text-primary mb-1">{{ stats.new_users_month }}</h3>
         <p class="text-sm text-text-muted">本月新增</p>
@@ -195,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { User, UserFilled, Calendar, Document, TrendCharts, Search, Bell, ArrowRight } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getOverview, getTrends } from '../../api/dashboard'
@@ -208,12 +218,18 @@ const stats = ref({
   today_revisits: 0,
   pending_reports: 0,
   new_users_month: 0,
-  active_med_plans: 0
+  active_med_plans: 0,
+  total_users_change: 0,
+  active_users_change: 0,
+  today_revisits_change: 0,
+  pending_reports_change: 0,
+  new_users_month_change: 0
 })
 const recentUsers = ref<any[]>([])
 const upcomingRevisits = ref<any[]>([])
 
 let chartInstance: echarts.ECharts | null = null
+let resizeHandler: (() => void) | null = null
 
 const initChart = (data: any[]) => {
   const chartDom = document.getElementById('trendChart')
@@ -291,7 +307,19 @@ watch(trendPeriod, () => {
 
 onMounted(() => {
   fetchData()
-  window.addEventListener('resize', () => chartInstance?.resize())
+  resizeHandler = () => chartInstance?.resize()
+  window.addEventListener('resize', resizeHandler)
+})
+
+onUnmounted(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 </script>
 

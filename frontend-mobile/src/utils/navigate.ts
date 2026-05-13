@@ -17,7 +17,6 @@ export const safeNavigate = (options: NavigateOptions): Promise<void> => {
     const { url, type = 'navigateTo' } = options
     
     const handleSuccess = () => {
-      console.log(`[Navigate] ${type} success: ${url}`)
       resolve()
     }
     
@@ -27,10 +26,8 @@ export const safeNavigate = (options: NavigateOptions): Promise<void> => {
       // 如果是 navigateTo 失败，尝试 redirectTo
       if (type === 'navigateTo') {
         const pages = getCurrentPages()
-        console.log(`[Navigate] Current page stack: ${pages.length}`)
         
         if (pages.length >= 10) {
-          console.log('[Navigate] Page stack full, using redirectTo')
           uni.redirectTo({
             url,
             success: handleSuccess,
@@ -56,7 +53,6 @@ export const safeNavigate = (options: NavigateOptions): Promise<void> => {
         
         // 如果不是页面栈问题，尝试延时重试
         if (err.errMsg && err.errMsg.includes('timeout')) {
-          console.log('[Navigate] Timeout detected, retrying...')
           setTimeout(() => {
             uni.navigateTo({
               url,
@@ -150,10 +146,8 @@ export const safeNavigateBack = (delta: number = 1): Promise<void> => {
  */
 export const checkAndCleanPageStack = () => {
   const pages = getCurrentPages()
-  console.log(`[Navigate] Current page stack: ${pages.length}`)
   
   if (pages.length >= 9) {
-    console.log('[Navigate] Page stack near limit, consider using redirectTo')
     return false
   }
   

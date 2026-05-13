@@ -55,11 +55,6 @@ const routes = [
         component: () => import('../views/admin/DoctorApproval.vue')
       },
       {
-        path: 'diseases',
-        name: 'DiseaseManagement',
-        component: () => import('../views/admin/DiseaseManagement.vue')
-      },
-      {
         path: 'reports',
         name: 'ReportManagement',
         component: () => import('../views/admin/ReportManagement.vue')

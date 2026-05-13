@@ -36,7 +36,6 @@ export const useMemberStore = defineStore('member', () => {
 
   const addMember = async (data: MemberFormData) => {
     try {
-      console.log('Adding member with data:', JSON.stringify(data))
       const newMember: any = await createMember(data)
       members.value.push(newMember)
       uni.showToast({

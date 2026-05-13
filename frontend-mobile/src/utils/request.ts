@@ -1,6 +1,7 @@
 export const BASE_URL = '/api'
-// 小程序本地开发直连后端（微信开发者工具需开启"不校验合法域名"）
-const MP_BASE_URL = 'http://127.0.0.1:8000'
+// 小程序/APP 直连后端地址，可通过环境变量配置
+// 微信开发者工具需开启"不校验合法域名"
+const MP_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 interface RequestOptions {
   url: string
@@ -22,7 +23,7 @@ const request = (options: RequestOptions) => {
     // #endif
 
     // #ifdef APP-PLUS
-    finalUrl = 'http://192.168.1.100:8000' + options.url // 请替换为您的局域网IP
+    finalUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000') + options.url
     // #endif
 
     let queryStr = ''
@@ -36,7 +37,7 @@ const request = (options: RequestOptions) => {
       }
     }
     
-    console.log('[Request]', options.method || 'GET', finalUrl + queryStr)
+    if (import.meta.env.DEV) console.log('[Request]', options.method || 'GET', finalUrl + queryStr)
     
     uni.request({
       url: finalUrl + queryStr,
@@ -48,7 +49,7 @@ const request = (options: RequestOptions) => {
       },
       timeout: options.timeout || 30000, // 默认30秒超时
       success: (res: any) => {
-        console.log('[Response]', res.statusCode, res.data)
+        if (import.meta.env.DEV) console.log('[Response]', res.statusCode, res.data)
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else if (res.statusCode === 401) {

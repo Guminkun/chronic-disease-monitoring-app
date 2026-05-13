@@ -5,7 +5,9 @@
 			"style": {
 				"navigationBarTitleText": "首页",
 				"navigationBarBackgroundColor": "#ffffff",
-				"navigationBarTextStyle": "black"
+				"navigationBarTextStyle": "black",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "dark"
 			}
 		},
 		{
@@ -320,6 +322,20 @@
 			"path": "pages/medication-guide/detail",
 			"style": {
 				"navigationBarTitleText": "药品详情",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/legal/privacy",
+			"style": {
+				"navigationBarTitleText": "隐私政策",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
+			"path": "pages/legal/terms",
+			"style": {
+				"navigationBarTitleText": "用户协议",
 				"navigationBarBackgroundColor": "#ffffff"
 			}
 		}

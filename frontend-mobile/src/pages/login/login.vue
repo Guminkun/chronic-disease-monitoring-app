@@ -128,7 +128,7 @@
         </view>
       </view>
       <view class="agreement-text">
-        已阅读并同意<text class="link-text">服务协议</text>和<text class="link-text">隐私保护指引</text>
+        已阅读并同意<text class="link-text" @click.stop="goTerms">服务协议</text>和<text class="link-text" @click.stop="goPrivacy">隐私保护指引</text>
       </view>
     </view>
 
@@ -141,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { navigateAfterLogin } from '@/utils/auth'
 import { sendSmsCode as sendSmsCodeApi } from '@/api/auth'
@@ -152,9 +152,10 @@ const phone = ref('')
 const password = ref('')
 const smsCode = ref('')
 const showPassword = ref(false)
-const agreeProtocol = ref(true)
+const agreeProtocol = ref(false)
 const loading = ref(false)
 const smsCountdown = ref(0)
+let smsTimer: ReturnType<typeof setInterval> | null = null
 
 const canSubmit = computed(() => {
   if (loginType.value === 'password') {
@@ -168,6 +169,13 @@ onMounted(() => {
   // 在微信小程序环境下，检查登录状态
   checkLoginStatus()
   // #endif
+})
+
+onUnmounted(() => {
+  if (smsTimer) {
+    clearInterval(smsTimer)
+    smsTimer = null
+  }
 })
 
 const checkLoginStatus = async () => {
@@ -195,7 +203,7 @@ const autoWechatLogin = async () => {
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => navigateAfterLogin(), 800)
   } catch (e: any) {
-    console.log('Auto wechat login failed:', e)
+    if (import.meta.env.DEV) console.log('Auto wechat login failed:', e)
     // 自动登录失败，清除标记，让用户手动登录
     uni.removeStorageSync('hasLoggedInBefore')
   } finally {
@@ -215,6 +223,14 @@ const goRegister = () => {
   uni.navigateTo({ url: '/pages/register/patient-register' })
 }
 
+const goPrivacy = () => {
+  uni.navigateTo({ url: '/pages/legal/privacy' })
+}
+
+const goTerms = () => {
+  uni.navigateTo({ url: '/pages/legal/terms' })
+}
+
 const sendSmsCode = async () => {
   if (smsCountdown.value > 0) return
   if (phone.value.length !== 11) {
@@ -226,10 +242,12 @@ const sendSmsCode = async () => {
     await sendSmsCodeApi({ phone: phone.value })
     uni.showToast({ title: '验证码已发送', icon: 'success' })
     smsCountdown.value = 60
-    const timer = setInterval(() => {
+    if (smsTimer) clearInterval(smsTimer)
+    smsTimer = setInterval(() => {
       smsCountdown.value--
       if (smsCountdown.value <= 0) {
-        clearInterval(timer)
+        if (smsTimer) clearInterval(smsTimer)
+        smsTimer = null
       }
     }, 1000)
   } catch (e: any) {

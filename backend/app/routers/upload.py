@@ -7,6 +7,8 @@ from .. import models, dependencies
 from ..database import get_db
 from ..services.minio_service import minio_service
 from ..config import settings
+from ..logging_config import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/upload",
@@ -50,9 +52,9 @@ async def upload_avatar(
             compressed_content, 
             str(current_user.id),
             "avatar",
-            "avatars",
+            settings.MINIO_BUCKET_AVATARS,
             "image/jpeg",
-            bucket_name="avatars"
+            bucket_name=settings.MINIO_BUCKET_AVATARS
         )
         
         endpoint = settings.MINIO_ENDPOINT
@@ -62,7 +64,7 @@ async def upload_avatar(
         
         return {"url": url, "filename": file_key}
     except Exception as e:
-        print(f"头像上传失败: {e}")
+        logger.error(f"头像上传失败: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"头像上传失败: {str(e)}")

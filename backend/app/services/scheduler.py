@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from ..database import SessionLocal
-from ..models import MedicationPlan, MedicationLog, User, WechatSubscription, Reminder
+from ..models import MedicationPlan, MedicationLog, User, WechatSubscription, Reminder, Notification
 from ..services.wechat_service import wechat_service
 from ..config import settings
 from ..logging_config import get_logger
@@ -56,15 +56,15 @@ class BackgroundScheduler:
                         days_diff = (today - plan.start_date).days
                         if days_diff >= 0 and days_diff % (interval + 1) == 0:
                             is_due = True
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.error(f"解析interval频率失败: {e}")
                 elif plan.frequency_type == "specific_days":
                     try:
                         weekday = today.weekday() + 1
                         if str(weekday) in (plan.frequency_value or "").split(","):
                             is_due = True
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.error(f"解析specific_days频率失败: {e}")
                 
                 if not is_due:
                     continue
@@ -221,7 +221,7 @@ class BackgroundScheduler:
                         is_due = today.weekday() == 0  # 周一
                     elif freq == '每周两次':
                         days_diff = (today - reminder.created_at.date()).days
-                        is_due = days_diff % 3 == 0 or days_diff % 3 == 3
+                        is_due = days_diff % 3 == 0 or days_diff % 3 == 1
                     else:
                         is_due = True
                     
@@ -233,6 +233,16 @@ class BackgroundScheduler:
                     reminder_window_end = scheduled_time
                     
                     if not (reminder_window_start <= now <= reminder_window_end):
+                        continue
+                    
+                    # 去重检查：今天是否已发送过该提醒
+                    existing_notification = db.query(Notification).filter(
+                        Notification.patient_id == reminder.patient_id,
+                        Notification.title == reminder.title,
+                        Notification.created_at >= datetime.combine(today, datetime.min.time())
+                    ).first()
+                    
+                    if existing_notification:
                         continue
                     
                     # 获取用户信息

@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from typing import List, Optional
 from . import models, schemas, auth_utils
+from .services.encryption_service import encrypt_field, decrypt_field
 from fastapi import HTTPException, status
 import uuid
 
@@ -54,33 +55,57 @@ def update_wechat_user_info(db: Session, user_id: uuid.UUID, openid: str, unioni
     return db_user
 
 
+_SENSITIVE_PATIENT_FIELDS = {"id_card", "allergy_history", "past_history"}
+
+
 # --- Patient ---
 def create_patient(db: Session, patient: schemas.PatientCreate, user_id: uuid.UUID):
-    db_patient = models.Patient(**patient.model_dump(), user_id=user_id)
+    data = patient.model_dump()
+    for field in _SENSITIVE_PATIENT_FIELDS:
+        if field in data and data[field]:
+            data[field] = encrypt_field(data[field])
+    db_patient = models.Patient(**data, user_id=user_id)
     db.add(db_patient)
     db.commit()
     db.refresh(db_patient)
     return db_patient
 
 def get_patient_by_user_id(db: Session, user_id: uuid.UUID):
-    return db.query(models.Patient).filter(models.Patient.user_id == user_id).first()
+    patient = db.query(models.Patient).filter(models.Patient.user_id == user_id).first()
+    if patient:
+        _decrypt_patient(patient)
+    return patient
 
 def get_patient(db: Session, patient_id: uuid.UUID):
-    return db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if patient:
+        _decrypt_patient(patient)
+    return patient
 
 def update_patient(db: Session, patient_id: uuid.UUID, patient_update: schemas.PatientUpdate):
-    db_patient = get_patient(db, patient_id)
+    db_patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
     if not db_patient:
         return None
     
     update_data = patient_update.model_dump(exclude_unset=True)
+    for field in _SENSITIVE_PATIENT_FIELDS:
+        if field in update_data and update_data[field]:
+            update_data[field] = encrypt_field(update_data[field])
     for key, value in update_data.items():
         setattr(db_patient, key, value)
         
     db.add(db_patient)
     db.commit()
     db.refresh(db_patient)
+    _decrypt_patient(db_patient)
     return db_patient
+
+
+def _decrypt_patient(patient):
+    for field in _SENSITIVE_PATIENT_FIELDS:
+        val = getattr(patient, field, None)
+        if val:
+            setattr(patient, field, decrypt_field(val))
 
 # --- Doctor ---
 def create_doctor(db: Session, doctor: schemas.DoctorCreate, user_id: uuid.UUID):

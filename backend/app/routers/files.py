@@ -137,7 +137,7 @@ def get_member_avatar_url(
         raise HTTPException(status_code=404, detail="Member has no avatar")
     
     try:
-        url = minio_service.get_presigned_url(member.avatar_url, bucket_name="avatars")
+        url = minio_service.get_presigned_url(member.avatar_url, bucket_name=settings.MINIO_BUCKET_AVATARS)
         return {
             "success": True,
             "url": url,
@@ -176,7 +176,12 @@ def cleanup_member_files(
         prefix = f"user_{patient.user_id}/member_{member_id}/"
         
         # Delete from all buckets
-        buckets = ["jianchabaogao", "binli", "avatars", "usageguides"]
+        buckets = [
+            settings.MINIO_BUCKET_REPORT or "jianchabaogao",
+            settings.MINIO_BUCKET_MEDICAL or "binli",
+            settings.MINIO_BUCKET_AVATARS,
+            settings.MINIO_BUCKET_GUIDES,
+        ]
         total_deleted = 0
         
         for bucket in buckets:

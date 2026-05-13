@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
-from datetime import date, timedelta
-from typing import List, Dict, Any
-from .. import models
+from datetime import date, timedelta, datetime
+from typing import List, Dict, Any, Optional
+from .. import models, dependencies
 from ..database import get_db
 
 router = APIRouter(
@@ -126,3 +126,66 @@ def get_activity_trends(
         })
         
     return trends
+
+
+@router.get("/logs")
+def get_system_logs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    action: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
+):
+    """获取系统审计日志（管理员专用）"""
+    query = db.query(models.SystemLog).join(
+        models.User, models.SystemLog.user_id == models.User.id, isouter=True
+    )
+
+    if action:
+        query = query.filter(models.SystemLog.action == action)
+    if q:
+        query = query.filter(
+            models.SystemLog.action.ilike(f"%{q}%") |
+            models.User.phone.ilike(f"%{q}%")
+        )
+
+    total = query.count()
+    logs = query.order_by(models.SystemLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    action_text_map = {
+        "login": "用户登录",
+        "create_report": "上传检查报告",
+        "delete_report": "删除检查报告",
+        "export_data": "导出用户数据",
+        "delete_account": "注销账号",
+        "create_medication_plan": "创建用药计划",
+    }
+    action_type_map = {
+        "login": ("read", "阅读"),
+        "create_report": ("publish", "发布"),
+        "delete_report": ("edit", "编辑"),
+        "export_data": ("read", "阅读"),
+        "delete_account": ("edit", "编辑"),
+        "create_medication_plan": ("publish", "发布"),
+    }
+
+    items = []
+    for log in logs:
+        user = db.query(models.User).filter(models.User.id == log.user_id).first() if log.user_id else None
+        role_label = {"patient": "患者", "doctor": "医生", "admin": "管理员"}.get(user.role.value if user else "", "用户")
+        phone_suffix = user.phone[-4:] if user and user.phone else "----"
+        atype, atype_text = action_type_map.get(log.action, ("info", "其他"))
+
+        items.append({
+            "time": log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
+            "user": f"{role_label} · {phone_suffix}",
+            "action": action_text_map.get(log.action, log.action),
+            "type": atype,
+            "typeText": atype_text,
+            "status": "success",
+            "ip": log.ip_address or "-",
+            "details": log.details,
+        })
+
+    return {"total": total, "items": items}

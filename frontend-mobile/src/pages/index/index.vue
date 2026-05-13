@@ -105,6 +105,17 @@
       size="medium"
     />
 
+    <!-- ─── 骨架屏 loading ─── -->
+    <view v-if="pageLoading && userStore.token" class="skeleton-wrap">
+      <view class="skeleton-card" v-for="i in 3" :key="i">
+        <view class="skeleton-head">
+          <view class="skeleton-icon"></view>
+          <view class="skeleton-title"></view>
+        </view>
+        <view class="skeleton-line" v-for="j in 2" :key="j"></view>
+      </view>
+    </view>
+
     <!-- ─── 通知弹层 ─── -->
     <view v-if="showNotifications" class="noti-mask" @click="toggleNotifications">
       <view class="noti-panel" @click.stop>
@@ -384,7 +395,7 @@ import { getDiseases, getHealthReadings } from '@/api/patient'
 import { getDailyTasks, getStats } from '@/api/medication'
 import { getNotifications, getUnreadNotificationCount, getPatientDynamicNotifications } from '@/api/notification'
 import { checkLoginWithRedirect } from '@/utils/auth'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import AuthPrompt from '@/components/AuthPrompt.vue'
 import CustomTabBar from '@/components/tabbar/CustomTabBar.vue'
 
@@ -396,6 +407,7 @@ const showMemberPanel = ref(false)
 const todayMeds = ref<any[]>([])
 const unreadNotificationCount = ref(0)
 const latestNotifications = ref<NotificationItem[]>([])
+const pageLoading = ref(true)
 
 interface MonitorItem {
   value: string
@@ -592,6 +604,27 @@ const goToNotifications = () => { if (!checkLogin()) return; safeNavigate({ url:
 const navigateToRecordList = () => { if (!checkLogin()) return; safeNavigate({ url: '/pages/medical-record/list' }) }
 const goToMedicationGuide = () => { safeNavigate({ url: '/pages/medication-guide/category' }) }
 
+const refreshAllData = async () => {
+  if (!userStore.token) return
+  await memberStore.loadMembers()
+  const currentMemberId = memberStore.currentMember?.id
+  await Promise.all([
+    loadMyDiseases(currentMemberId),
+    loadNotificationCount(),
+    loadLatestNotifications(),
+    loadTodayMeds(currentMemberId),
+    loadMonitorData(currentMemberId)
+  ])
+}
+
+onPullDownRefresh(async () => {
+  try {
+    await refreshAllData()
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
+
 onShow(async () => {
   if (!userStore.token) return
   
@@ -599,11 +632,16 @@ onShow(async () => {
   
   const currentMemberId = memberStore.currentMember?.id
   
-  loadMyDiseases(currentMemberId)
-  loadNotificationCount()
-  loadLatestNotifications()
-  loadTodayMeds(currentMemberId)
-  loadMonitorData(currentMemberId)
+  pageLoading.value = true
+  await Promise.all([
+    loadMyDiseases(currentMemberId),
+    loadNotificationCount(),
+    loadLatestNotifications(),
+    loadTodayMeds(currentMemberId),
+    loadMonitorData(currentMemberId)
+  ]).finally(() => {
+    pageLoading.value = false
+  })
 })
 </script>
 
@@ -1092,14 +1130,15 @@ onShow(async () => {
 .d-tag {
   display: flex;
   align-items: center;
-  padding: 8px 14px;
+  padding: 10px 18px;
   border-radius: 14px;
   transition: transform 0.2s ease;
+  min-height: 72rpx;
 }
 .d-tag:active {
   transform: scale(0.96);
 }
-.d-tag-name { font-size: 14px; font-weight: 600; }
+.d-tag-name { font-size: 15px; font-weight: 600; }
 .tag-green { background: #f0fdf4; }
 .tag-green .d-tag-name { color: #15803d; }
 .tag-orange { background: #fff7ed; }
@@ -1116,8 +1155,9 @@ onShow(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #f8fafc;
+  min-height: 80rpx;
 }
 .med-row:last-child { border-bottom: none; }
 .med-dot {
@@ -1129,7 +1169,7 @@ onShow(async () => {
 .dot-blue { background: #3b82f6; }
 .dot-gray { background: #cbd5e1; }
 .med-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.med-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+.med-name { font-size: 16px; font-weight: 600; color: #1e293b; }
 .med-taken { color: #94a3b8 !important; }
 .med-dosage { font-size: 12px; color: #94a3b8; }
 .med-tag-pending {
@@ -1189,7 +1229,7 @@ onShow(async () => {
 .monitor-emoji { font-size: 18px; }
 .monitor-label { font-size: 12px; color: #94a3b8; }
 .monitor-value-row { display: flex; align-items: baseline; gap: 3px; }
-.monitor-value { font-size: 22px; font-weight: 800; color: #1e293b; }
+.monitor-value { font-size: 24px; font-weight: 800; color: #1e293b; }
 .monitor-unit { font-size: 11px; color: #64748b; }
 .monitor-time { font-size: 11px; color: #94a3b8; }
 
@@ -1198,8 +1238,9 @@ onShow(async () => {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #f8fafc;
+  min-height: 88rpx;
 }
 .todo-row:last-child { border-bottom: none; }
 .todo-icon-box {
@@ -1236,7 +1277,7 @@ onShow(async () => {
   padding: 2px 8px;
   border-radius: 10px;
 }
-.todo-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+.todo-name { font-size: 16px; font-weight: 600; color: #1e293b; }
 .todo-desc { font-size: 12px; color: #64748b; }
 .todo-arrow { font-size: 20px; color: #cbd5e1; }
 
@@ -1453,7 +1494,7 @@ onShow(async () => {
 }
 
 .more-label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 600;
   color: #374151;
   text-align: center;
@@ -1463,5 +1504,60 @@ onShow(async () => {
 .safe-bottom {
   height: 0;
   pointer-events: none;
+}
+
+/* ── 骨架屏 ── */
+.skeleton-wrap {
+  padding: 0 16px;
+}
+
+.skeleton-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.skeleton-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-title {
+  width: 80px;
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-line:last-child {
+  width: 60%;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>

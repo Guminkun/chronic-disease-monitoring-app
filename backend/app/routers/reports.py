@@ -5,12 +5,15 @@ from app.services import ocr_service
 from app.services.minio_service import minio_service
 from app.config import settings
 from app import crud, models, dependencies, schemas
+from ..services.audit_service import log_action
 from typing import Optional, List
 from pydantic import UUID4
 from datetime import date
 import datetime
 import httpx
 from sqlalchemy import func
+from ..logging_config import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/reports",
@@ -125,14 +128,14 @@ async def parse_report(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(dependencies.get_current_active_user)
 ):
-    print(f"Received report upload request: filename={file.filename}, type={file.content_type}")
-    print(f"Form data: patient_disease_id={patient_disease_id}, hospital_id={hospital_id}")
+    logger.debug(f"Received report upload request: filename={file.filename}, type={file.content_type}")
+    logger.debug(f"Form data: patient_disease_id={patient_disease_id}, hospital_id={hospital_id}")
 
     if not file:
         raise HTTPException(status_code=400, detail="No file uploaded")
     
     content = await file.read()
-    print(f"File content read, size: {len(content)} bytes")
+    logger.debug(f"File content read, size: {len(content)} bytes")
     
     try:
         bucket = (
@@ -149,19 +152,19 @@ async def parse_report(
             bucket_name=bucket
         )
         minio_url = minio_service.get_presigned_url(file_key, bucket_name=bucket)
-        print(f"MinIO upload successful: {minio_url}")
+        logger.info(f"MinIO upload successful: {minio_url}")
     except Exception as e:
-        print(f"MinIO upload failed: {e}")
+        logger.error(f"MinIO upload failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload file to storage: {str(e)}")
 
     try:
-        print("Calling OCR service...")
+        logger.info("Calling OCR service...")
         parsed_data = await ocr_service.parse_report_file(content, file.filename)
-        print("OCR service returned data")
+        logger.info("OCR service returned data")
     except Exception as e:
-        print(f"Parsing error: {e}")
+        logger.error(f"Parsing error: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         if isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout)):
             raise HTTPException(status_code=504, detail="OCR服务超时，请稍后重试")
         msg = str(e) if e else ""
@@ -403,7 +406,9 @@ def delete_report(
     success = crud.delete_report(db, report_id=report_id)
     if not success:
          raise HTTPException(status_code=500, detail="Failed to delete report")
-    
+
+    log_action(db, user_id=current_user.id, action="delete_report", resource="reports")
+
     return
 
 
@@ -558,7 +563,7 @@ async def auto_classify_report(
         if parsed_data.get("report_date"):
             try:
                 report_date = datetime.datetime.strptime(parsed_data["report_date"], "%Y-%m-%d").date()
-            except:
+            except (ValueError, TypeError):
                 pass
     except Exception as e:
         if isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout)):
@@ -613,7 +618,9 @@ async def auto_classify_report(
     
     db.commit()
     db.refresh(report)
-    
+
+    log_action(db, user_id=current_user.id, action="create_report", resource="reports", details={"report_type": report_type_name})
+
     message = "上传成功"
     if report_category == 'unknown':
         message = "无法自动识别类型，已标记为未分类"

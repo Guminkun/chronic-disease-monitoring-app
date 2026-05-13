@@ -56,12 +56,13 @@ export function batchDeleteMedicalRecords(ids: string[]) {
 export function uploadMedicalRecord(filePath: string, memberId?: string) {
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token')
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
     let url = `${BASE_URL}/patients/medical-records/upload`
     // #ifdef MP-WEIXIN
-    url = 'http://127.0.0.1:8000/patients/medical-records/upload'
+    url = `${apiBase}/patients/medical-records/upload`
     // #endif
     // #ifdef APP-PLUS
-    url = 'http://192.168.1.100:8000/patients/medical-records/upload'
+    url = `${apiBase}/patients/medical-records/upload`
     // #endif
     
     const formData: any = {}

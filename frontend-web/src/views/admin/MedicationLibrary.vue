@@ -661,7 +661,7 @@ const submitImport = async () => {
     ElMessage.success(res.message)
     if (res.errors && res.errors.length > 0) {
       ElMessage.warning(`部分导入失败: ${res.errors.length} 条`)
-      console.warn(res.errors)
+      if (import.meta.env.DEV) console.warn(res.errors)
     }
     importDialogVisible.value = false
     fetchData()

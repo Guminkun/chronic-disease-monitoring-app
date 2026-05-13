@@ -1,17 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 import random
 import httpx
 from .. import crud, schemas, auth_utils, dependencies
 from ..config import settings
 from ..models import UserRole
+from ..logging_config import get_logger
+from ..services.audit_service import log_action
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/auth",
     tags=["auth"],
 )
+
+# Verification code storage with TTL: {phone: {"code": str, "expires_at": datetime}}
+_VERIFICATION_CODES: dict[str, dict] = {}
+_CODE_TTL_MINUTES = 5
+
+
+def _cleanup_expired_codes():
+    now = datetime.now(timezone.utc)
+    expired = [p for p, v in _VERIFICATION_CODES.items() if v["expires_at"] < now]
+    for p in expired:
+        del _VERIFICATION_CODES[p]
 
 @router.post("/register/patient", response_model=schemas.UserResponse, summary="患者注册", description="注册新患者账号，包含基本用户信息和患者档案。")
 def register_patient(user: schemas.UserCreate, patient_info: schemas.PatientCreate, db: Session = Depends(dependencies.get_db)):
@@ -82,6 +97,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = auth_utils.create_access_token(
         data={"sub": user.phone, "role": user.role.value, "user_id": str(user.id)}, expires_delta=access_token_expires
     )
+    log_action(db, user_id=user.id, action="login", resource="auth", details={"method": "password"})
     return {"access_token": access_token, "token_type": "bearer", "role": user.role.value, "user_id": user.id}
 
 # In-memory storage for verification codes (phone -> code)
@@ -92,11 +108,21 @@ async def send_verification_code(request: schemas.SMSCodeRequest):
     """
     发送短信验证码
     """
+    _cleanup_expired_codes()
+    
+    # Rate limit: max 1 code per 60 seconds
+    existing = _VERIFICATION_CODES.get(request.phone)
+    if existing and existing["expires_at"] > datetime.now(timezone.utc) - timedelta(minutes=_CODE_TTL_MINUTES - 1):
+        raise HTTPException(status_code=429, detail="请等待 60 秒后再重试")
+    
     # Generate 6-digit code
     code = str(random.randint(100000, 999999))
     
-    # Store code
-    VERIFICATION_CODES[request.phone] = code
+    # Store code with TTL
+    _VERIFICATION_CODES[request.phone] = {
+        "code": code,
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=_CODE_TTL_MINUTES)
+    }
     
     # Send SMS via external service
     try:
@@ -106,11 +132,12 @@ async def send_verification_code(request: schemas.SMSCodeRequest):
             # await client.post(settings.SMS_SERVICE_URL, json=payload)
             pass
     except Exception as e:
-        # Log error but don't fail for now since it might be a mock URL
-        print(f"Failed to send SMS: {e}")
+        logger.error(f"Failed to send SMS to {request.phone}: {e}")
     
-    # For development convenience, return the code in response
-    return {"message": "Verification code sent", "code": code}
+    # Log code for development debugging (never return in response)
+    logger.info(f"SMS verification code for {request.phone}: {code}")
+    
+    return {"message": "Verification code sent"}
 
 @router.post("/sms/login", response_model=schemas.Token, summary="验证码登录")
 def login_with_verification_code(request: schemas.SMSLoginRequest, db: Session = Depends(dependencies.get_db)):
@@ -118,11 +145,17 @@ def login_with_verification_code(request: schemas.SMSLoginRequest, db: Session =
     使用验证码登录
     """
     # Verify code
-    stored_code = VERIFICATION_CODES.get(request.phone)
-    if not stored_code or stored_code != request.code:
+    stored = _VERIFICATION_CODES.get(request.phone)
+    if not stored or stored["code"] != request.code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification code"
+            detail="验证码错误"
+        )
+    if stored["expires_at"] < datetime.now(timezone.utc):
+        _VERIFICATION_CODES.pop(request.phone, None)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="验证码已过期，请重新获取"
         )
     
     # Get user
@@ -134,7 +167,7 @@ def login_with_verification_code(request: schemas.SMSLoginRequest, db: Session =
         )
     
     # Remove code after use
-    VERIFICATION_CODES.pop(request.phone, None)
+    _VERIFICATION_CODES.pop(request.phone, None)
     
     # Create token
     access_token_expires = timedelta(minutes=auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -231,3 +264,20 @@ async def update_wechat_profile(
         "nickname": current_user.wechat_nickname,
         "avatar": current_user.wechat_avatar
     }
+
+@router.post("/refresh", response_model=schemas.Token, summary="刷新Token")
+def refresh_token(current_user = Depends(dependencies.get_current_active_user)):
+    """
+    使用当前有效Token换取新Token，延长会话时间。
+    前端应在Token即将过期时调用此接口。
+    """
+    access_token_expires = timedelta(minutes=auth_utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth_utils.create_access_token(
+        data={
+            "sub": current_user.phone or current_user.wechat_openid,
+            "role": current_user.role.value,
+            "user_id": str(current_user.id)
+        },
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer", "role": current_user.role.value, "user_id": current_user.id}

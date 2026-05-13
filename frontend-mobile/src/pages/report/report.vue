@@ -337,9 +337,10 @@ const chooseFromCamera = () => {
   hideUploadOptions()
   uni.chooseImage({
     count: 9,
+    sizeType: ['compressed'],
     sourceType: ['camera'],
     success: (res) => {
-      handleUploadFiles(res.tempFilePaths)
+      validateAndUpload(res.tempFilePaths, res.tempFiles)
     }
   })
 }
@@ -348,11 +349,32 @@ const chooseFromAlbum = () => {
   hideUploadOptions()
   uni.chooseImage({
     count: 9,
+    sizeType: ['compressed'],
     sourceType: ['album'],
     success: (res) => {
-      handleUploadFiles(res.tempFilePaths)
+      validateAndUpload(res.tempFilePaths, res.tempFiles)
     }
   })
+}
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
+
+const validateAndUpload = (filePaths: string[], tempFiles?: any[]) => {
+  if (tempFiles && tempFiles.length > 0) {
+    const oversized = tempFiles.filter((f: any) => f.size > MAX_FILE_SIZE)
+    if (oversized.length > 0) {
+      uni.showModal({
+        title: '文件过大',
+        content: `${oversized.length} 张图片超过 20MB，已自动过滤。建议压缩后重新上传。`,
+        showCancel: false
+      })
+      const validPaths = tempFiles.filter((f: any) => f.size <= MAX_FILE_SIZE).map((f: any) => f.path || f)
+      if (validPaths.length === 0) return
+      handleUploadFiles(validPaths)
+      return
+    }
+  }
+  handleUploadFiles(filePaths)
 }
 
 const handleUploadFiles = async (filePaths: string[]) => {

@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str
     MINIO_BUCKET_REPORT: str | None = None
     MINIO_BUCKET_MEDICAL: str | None = None
+    MINIO_BUCKET_AVATARS: str = "avatars"
+    MINIO_BUCKET_GUIDES: str = "usageguides"
     MINIO_SECURE: bool = False
 
     # Logging Configuration
@@ -63,3 +65,14 @@ class Settings(BaseSettings):
 
 # 创建全局配置实例
 settings = Settings()
+
+# 启动时校验关键安全配置
+_WEAK_SECRET_KEYS = {"your-secret-key-should-be-in-env-file", "secret", "change-me", ""}
+if settings.SECRET_KEY in _WEAK_SECRET_KEYS:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY is using a weak or default value! "
+        "Please set a strong SECRET_KEY in your .env file. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\"",
+        stacklevel=2,
+    )

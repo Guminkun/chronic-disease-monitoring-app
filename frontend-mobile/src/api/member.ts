@@ -1,12 +1,13 @@
 import request from '../utils/request'
 
 const getBaseURL = () => {
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
   // #ifdef MP-WEIXIN
-  return 'http://127.0.0.1:8000'
+  return apiBase
   // #endif
   
   // #ifdef APP-PLUS
-  return 'http://192.168.1.100:8000'
+  return apiBase
   // #endif
   
   // #ifdef H5
@@ -55,7 +56,6 @@ export interface MemberFormData {
 }
 
 export const getMembers = () => {
-  console.log('Getting members, token:', uni.getStorageSync('token'))
   return request({ url: '/members/', method: 'GET' })
 }
 
@@ -64,8 +64,6 @@ export const getMember = (id: string) => {
 }
 
 export const createMember = (data: MemberFormData) => {
-  console.log('Creating member, token:', uni.getStorageSync('token'))
-  console.log('Member data:', data)
   return request({ url: '/members/', method: 'POST', data })
 }
 
