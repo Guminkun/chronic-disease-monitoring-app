@@ -100,6 +100,11 @@ const routes = [
         path: '',
         name: 'DoctorDashboard',
         component: () => import('../views/doctor/Dashboard.vue')
+      },
+      {
+        path: 'patients',
+        name: 'DoctorPatients',
+        component: () => import('../views/doctor/Patients.vue')
       }
     ]
   }

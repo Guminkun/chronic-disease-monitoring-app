@@ -1,5 +1,5 @@
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from ..config import settings
 from ..logging_config import get_logger
@@ -16,7 +16,7 @@ class WechatSubscriptionService:
         self._token_expires_at: Optional[datetime] = None
     
     async def get_access_token(self) -> Optional[str]:
-        if self._access_token and self._token_expires_at and datetime.now() < self._token_expires_at:
+        if self._access_token and self._token_expires_at and datetime.now(timezone.utc) < self._token_expires_at:
             return self._access_token
         
         if not self.appid or not self.secret:
@@ -38,7 +38,7 @@ class WechatSubscriptionService:
                 if "access_token" in data:
                     self._access_token = data["access_token"]
                     expires_in = data.get("expires_in", 7200)
-                    self._token_expires_at = datetime.now() + timedelta(seconds=expires_in - 300)
+                    self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in - 300)
                     logger.info(f"WeChat access token obtained, expires in {expires_in}s")
                     return self._access_token
                 else:

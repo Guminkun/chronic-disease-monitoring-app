@@ -5,9 +5,7 @@ import request from '@/utils/request'
  * @param fileKey 文件key路径
  */
 export const getPresignedUrl = (fileKey: string) => {
-  return request.get('/files/presigned-url', {
-    params: { file_key: fileKey }
-  })
+  return request({ url: '/files/presigned-url', method: 'GET', params: { file_key: fileKey } })
 }
 
 /**
@@ -16,9 +14,7 @@ export const getPresignedUrl = (fileKey: string) => {
  * @param thumbnail 是否获取缩略图（默认false）
  */
 export const getReportImageUrl = (reportId: string, thumbnail = false) => {
-  return request.get(`/files/report/${reportId}/image`, {
-    params: { thumbnail }
-  })
+  return request({ url: `/files/report/${reportId}/image`, method: 'GET', params: { thumbnail } })
 }
 
 /**
@@ -26,5 +22,5 @@ export const getReportImageUrl = (reportId: string, thumbnail = false) => {
  * @param memberId 成员ID
  */
 export const getMemberAvatarUrl = (memberId: string) => {
-  return request.get(`/files/member/${memberId}/avatar`)
+  return request({ url: `/files/member/${memberId}/avatar`, method: 'GET' })
 }

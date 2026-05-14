@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from .. import schemas, dependencies, models
 from ..database import get_db
 
@@ -168,7 +168,7 @@ def reply_feedback(
         raise HTTPException(status_code=404, detail="反馈不存在")
     
     feedback.reply_content = reply_data.reply_content
-    feedback.replied_at = datetime.now()
+    feedback.replied_at = datetime.now(timezone.utc)
     feedback.replied_by = current_user.id
     feedback.status = models.FeedbackStatus.replied
     

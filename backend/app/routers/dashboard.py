@@ -13,7 +13,8 @@ router = APIRouter(
 
 @router.get("/overview")
 def get_dashboard_overview(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     获取首页概览数据
@@ -95,7 +96,8 @@ def get_dashboard_overview(
 @router.get("/trends")
 def get_activity_trends(
     days: int = 30,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     获取最近30天用户活跃度趋势
@@ -170,9 +172,13 @@ def get_system_logs(
         "create_medication_plan": ("publish", "发布"),
     }
 
+    user_ids = {log.user_id for log in logs if log.user_id}
+    users = db.query(models.User).filter(models.User.id.in_(user_ids)).all() if user_ids else []
+    user_map = {u.id: u for u in users}
+
     items = []
     for log in logs:
-        user = db.query(models.User).filter(models.User.id == log.user_id).first() if log.user_id else None
+        user = user_map.get(log.user_id) if log.user_id else None
         role_label = {"patient": "患者", "doctor": "医生", "admin": "管理员"}.get(user.role.value if user else "", "用户")
         phone_suffix = user.phone[-4:] if user and user.phone else "----"
         atype, atype_text = action_type_map.get(log.action, ("info", "其他"))

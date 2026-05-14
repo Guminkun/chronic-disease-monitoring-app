@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.minio_service import minio_service
+from app.config import settings
 from app import models, dependencies, crud
 from app.logging_config import get_logger
 from pydantic import UUID4

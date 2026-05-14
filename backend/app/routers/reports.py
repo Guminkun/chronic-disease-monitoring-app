@@ -566,12 +566,7 @@ async def auto_classify_report(
             except (ValueError, TypeError):
                 pass
     except Exception as e:
-        if isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout)):
-            raise HTTPException(status_code=504, detail="OCR服务超时，请稍后重试")
-        msg = str(e) if e else ""
-        if "readtimeout" in msg.lower() or "timeout" in msg.lower():
-            raise HTTPException(status_code=504, detail="OCR服务超时，请稍后重试")
-        pass
+        logger.warning(f"OCR processing failed, report created with empty data: {e}")
     
     report_type_name = detect_report_type(ocr_text)
     

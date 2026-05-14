@@ -244,7 +244,7 @@ def create_report(db: Session, report: schemas.ReportCreate):
             bind = db.get_bind()
             models.ReportMetric.__table__.create(bind=bind, checkfirst=True)
         except Exception:
-            pass
+            pass  # Table already exists
         for m in metrics_data:
             db_metric = models.ReportMetric(
                 report_id=db_report.id,
@@ -403,7 +403,7 @@ def create_revisit_plan(db: Session, plan: schemas.RevisitPlanCreate, patient_id
         bind = db.get_bind()
         models.RevisitPlan.__table__.create(bind=bind, checkfirst=True)
     except Exception:
-        pass
+        pass  # Table already exists
 
     db_plan = models.RevisitPlan(
         patient_id=patient_id,
@@ -460,7 +460,7 @@ def create_revisit_record(db: Session, record: schemas.RevisitRecordCreate, pati
         bind = db.get_bind()
         models.RevisitRecord.__table__.create(bind=bind, checkfirst=True)
     except Exception:
-        pass
+        pass  # Table already exists
     
     db_record = models.RevisitRecord(
         patient_id=patient_id,

@@ -86,7 +86,7 @@ class MinioService:
         Returns:
             File key path
         """
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S")
         file_uuid = uuid.uuid4().hex[:8]
         
         if filename_prefix:
@@ -272,7 +272,7 @@ class MinioService:
                     'md5': md5_hash,
                     'user-id': user_id,
                     'member-id': member_id,
-                    'upload-time': datetime.datetime.now().isoformat()
+                    'upload-time': datetime.datetime.now(datetime.timezone.utc).isoformat()
                 }
             )
             

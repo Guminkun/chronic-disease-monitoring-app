@@ -19,7 +19,7 @@ export function getPublishedUsageGuides(params?: { skip?: number, limit?: number
   return request({
     url: '/usage-guides/published',
     method: 'GET',
-    data: params
+    params: params
   })
 }
 

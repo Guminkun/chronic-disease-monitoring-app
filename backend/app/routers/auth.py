@@ -100,9 +100,6 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     log_action(db, user_id=user.id, action="login", resource="auth", details={"method": "password"})
     return {"access_token": access_token, "token_type": "bearer", "role": user.role.value, "user_id": user.id}
 
-# In-memory storage for verification codes (phone -> code)
-VERIFICATION_CODES = {}
-
 @router.post("/sms/code", summary="发送验证码")
 async def send_verification_code(request: schemas.SMSCodeRequest):
     """
@@ -135,7 +132,7 @@ async def send_verification_code(request: schemas.SMSCodeRequest):
         logger.error(f"Failed to send SMS to {request.phone}: {e}")
     
     # Log code for development debugging (never return in response)
-    logger.info(f"SMS verification code for {request.phone}: {code}")
+    logger.debug(f"SMS verification code for {request.phone}: {code}")
     
     return {"message": "Verification code sent"}
 

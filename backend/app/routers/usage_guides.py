@@ -8,7 +8,7 @@ from sqlalchemy import or_
 from typing import List, Optional
 import json
 
-from .. import models, schemas
+from .. import models, schemas, dependencies
 from ..database import get_db
 from ..services.minio_service import minio_service
 from ..logging_config import get_logger
@@ -103,7 +103,8 @@ def get_usage_guide(
 @router.post("/", response_model=schemas.UsageGuideResponse, status_code=status.HTTP_201_CREATED)
 def create_usage_guide(
     guide: schemas.UsageGuideCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     创建使用说明（管理端）
@@ -119,7 +120,8 @@ def create_usage_guide(
 def update_usage_guide(
     guide_id: int,
     guide_update: schemas.UsageGuideUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     更新使用说明（管理端）
@@ -140,7 +142,8 @@ def update_usage_guide(
 @router.delete("/{guide_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_usage_guide(
     guide_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     删除使用说明（管理端）
@@ -232,7 +235,8 @@ async def upload_video(
 @router.post("/batch-delete", status_code=status.HTTP_204_NO_CONTENT)
 def batch_delete_usage_guides(
     request: schemas.BatchDeleteRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     批量删除使用说明（管理端）
@@ -245,7 +249,8 @@ def batch_delete_usage_guides(
 @router.put("/{guide_id}/publish", response_model=schemas.UsageGuideResponse)
 def toggle_publish(
     guide_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     切换发布状态（管理端）

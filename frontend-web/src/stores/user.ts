@@ -18,9 +18,14 @@ export const useUserStore = defineStore('user', {
       return res
     },
     async fetchUserInfo() {
-      const res = await getUserInfo()
-      this.user = res
-      return res
+      try {
+        const res = await getUserInfo()
+        this.user = res
+        return res
+      } catch (e) {
+        this.user = null
+        throw e
+      }
     },
     logout() {
       this.token = ''

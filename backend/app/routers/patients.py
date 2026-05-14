@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import UUID4
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from .. import crud, schemas, models, dependencies
 from ..binding_manager import manager as binding_manager
 from ..config import settings
@@ -943,7 +943,7 @@ async def confirm_monitoring_subscription(
     if existing:
         existing.is_subscribed = True
         existing.subscribe_count += 1
-        existing.updated_at = datetime.now()
+        existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(existing)
         return existing
@@ -1022,7 +1022,7 @@ def export_user_data(
     log_action(db, user_id=current_user.id, action="export_data", resource="patients")
 
     return {
-        "export_date": datetime.now().isoformat(),
+        "export_date": datetime.now(timezone.utc).isoformat(),
         "user": _ser(current_user, exclude={"password_hash"}),
         "patient_profile": _ser(patient),
         "diseases": [_ser(d) for d in diseases],

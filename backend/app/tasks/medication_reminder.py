@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List
 import sys
 import os
@@ -15,7 +15,7 @@ from ..logging_config import get_logger
 logger = get_logger(__name__)
 
 def get_medication_tasks_for_reminder(db: Session, reminder_time: datetime) -> List[dict]:
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     today = now.date()
     
     reminder_window_start = now - timedelta(minutes=2)
@@ -45,14 +45,14 @@ def get_medication_tasks_for_reminder(db: Session, reminder_time: datetime) -> L
                 days_diff = (today - plan.start_date).days
                 if days_diff >= 0 and days_diff % (interval + 1) == 0:
                     is_due = True
-            except:
+            except Exception:
                 pass
         elif plan.frequency_type == "specific_days":
             try:
                 weekday = today.weekday() + 1
                 if str(weekday) in (plan.frequency_value or "").split(","):
                     is_due = True
-            except:
+            except Exception:
                 pass
         
         if not is_due:
@@ -86,7 +86,7 @@ def get_medication_tasks_for_reminder(db: Session, reminder_time: datetime) -> L
 async def send_medication_reminders():
     db = SessionLocal()
     try:
-        tasks = get_medication_tasks_for_reminder(db, datetime.now())
+        tasks = get_medication_tasks_for_reminder(db, datetime.now(timezone.utc))
         
         for task in tasks:
             plan = task["plan"]
@@ -122,7 +122,7 @@ async def send_medication_reminders():
             
             if result.get("errcode") == 0:
                 subscription.used_count += 1
-                subscription.last_used_at = datetime.now()
+                subscription.last_used_at = datetime.now(timezone.utc)
                 db.commit()
                 logger.info(f"Reminder sent for plan {plan.id}, user {user.id}")
             else:

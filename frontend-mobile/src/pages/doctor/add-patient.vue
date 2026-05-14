@@ -112,7 +112,7 @@ const handleSubmitManual = async () => {
 const handleScan = () => {
   uni.scanCode({
     success: (res) => {
-      console.log('Scan result:', res)
+      if (import.meta.env.DEV) console.log('Scan result:', res)
       uni.showToast({
         title: '扫描成功',
         icon: 'success'
@@ -134,7 +134,7 @@ const handleUploadImage = () => {
     count: 1,
     sourceType: ['album'],
     success: (res) => {
-      console.log('Image selected:', res)
+      if (import.meta.env.DEV) console.log('Image selected:', res)
       // In a real app, you might decode QR from image here if supported
       uni.showToast({
         title: '图片已选择',

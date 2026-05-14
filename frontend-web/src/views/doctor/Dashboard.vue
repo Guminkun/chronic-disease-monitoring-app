@@ -211,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, reactive, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, reactive, computed } from 'vue'
 import { User, CircleCheck, Calendar, Bell, RefreshRight, Search, View, TrendCharts } from '@element-plus/icons-vue'
 import { getMyPatients, getPatientReadings, getPatientDetail, updatePatientDetail } from '../../api/doctor'
 import * as echarts from 'echarts'
@@ -230,7 +230,8 @@ const editForm = reactive({
   allergies: ''
 })
 const chartType = ref('blood_pressure')
-let chartInstance: any = null
+let chartInstance: echarts.ECharts | null = null
+let resizeHandler: (() => void) | null = null
 
 const activeCount = computed(() => patients.value.filter((p: any) => p.status === 'active').length)
 const todayAppointments = ref(0)
@@ -311,6 +312,8 @@ const initChart = async () => {
       chartInstance.dispose()
     }
     chartInstance = echarts.init(chartDom)
+    resizeHandler = () => { chartInstance?.resize() }
+    window.addEventListener('resize', resizeHandler)
     updateChart()
   }
 }
@@ -414,6 +417,17 @@ const formatGender = (gender: string) => {
 
 onMounted(() => {
   fetchPatients()
+})
+
+onUnmounted(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 </script>
 

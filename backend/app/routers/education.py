@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, desc
 from typing import List, Optional
-from .. import models, schemas
+from .. import models, schemas, dependencies
 from ..database import get_db
 
 router = APIRouter(
@@ -27,7 +27,8 @@ def get_categories(
 @router.post("/categories", response_model=schemas.ArticleCategoryResponse, status_code=status.HTTP_201_CREATED)
 def create_category(
     category: schemas.ArticleCategoryCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     (管理端) 创建分类
@@ -96,7 +97,8 @@ def get_article_detail(
 @router.post("/articles", response_model=schemas.ArticleResponse, status_code=status.HTTP_201_CREATED)
 def create_article(
     article: schemas.ArticleCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     (管理端) 创建文章
@@ -111,7 +113,8 @@ def create_article(
 def update_article(
     article_id: int,
     article_update: schemas.ArticleUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     (管理端) 更新文章

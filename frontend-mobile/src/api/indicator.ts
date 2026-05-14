@@ -4,7 +4,7 @@ export function getIndicators(params: { q?: string, category?: string }) {
   return request({
     url: '/indicators/',
     method: 'GET',
-    data: params
+    params: params
   })
 }
 

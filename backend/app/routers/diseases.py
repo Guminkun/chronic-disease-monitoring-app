@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from typing import List, Optional
 import pandas as pd
 import io
-from .. import models, schemas
+from .. import models, schemas, dependencies
 from ..database import get_db
 
 router = APIRouter(
@@ -50,7 +50,8 @@ def get_diseases(
 @router.post("/", response_model=schemas.DiseaseResponse, status_code=status.HTTP_201_CREATED)
 def create_disease(
     disease: schemas.DiseaseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     创建疾病
@@ -76,7 +77,8 @@ def create_disease(
 def update_disease(
     disease_id: int,
     disease_update: schemas.DiseaseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     更新疾病信息
@@ -107,7 +109,8 @@ def update_disease(
 @router.delete("/{disease_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_disease(
     disease_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     删除疾病
@@ -123,7 +126,8 @@ def delete_disease(
 @router.post("/batch-delete", status_code=status.HTTP_200_OK)
 def batch_delete_diseases(
     request: schemas.BatchDeleteRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     批量删除疾病
@@ -135,7 +139,8 @@ def batch_delete_diseases(
 @router.post("/batch-status", status_code=status.HTTP_200_OK)
 def batch_update_status(
     request: schemas.BatchStatusUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     批量更新疾病状态
@@ -190,7 +195,8 @@ def download_template():
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 async def import_diseases(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(dependencies.get_current_admin)
 ):
     """
     批量导入疾病 (Excel)

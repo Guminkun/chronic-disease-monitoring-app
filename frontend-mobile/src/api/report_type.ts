@@ -4,7 +4,7 @@ export function getReportTypes(params: { q?: string, category?: string }) {
   return request({
     url: '/report-types/',
     method: 'GET',
-    data: params
+    params: params
   })
 }
 
@@ -19,7 +19,7 @@ export function getImagingChecks(params: { q?: string, category?: string, part?:
   return request({
     url: '/imaging-checks/',
     method: 'GET',
-    data: params
+    params: params
   })
 }
 

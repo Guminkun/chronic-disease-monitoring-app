@@ -373,9 +373,6 @@ class ReportResponse(ReportBase):
     class Config:
         from_attributes = True
 
-    class Config:
-        from_attributes = True
-
 # --- Health Reading ---
 class HealthReadingBase(BaseModel):
     """健康指标基础模型"""

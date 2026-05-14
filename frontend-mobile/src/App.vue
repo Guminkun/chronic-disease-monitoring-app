@@ -33,7 +33,7 @@ const autoLoginIfNeeded = async () => {
       await userStore.loginByWechat();
       if (import.meta.env.DEV) console.log('Auto login succeeded');
     } catch (e) {
-      console.log('Auto login failed:', e);
+      if (import.meta.env.DEV) console.log('Auto login failed:', e);
       // 自动登录失败，清除标记
       uni.removeStorageSync('hasLoggedInBefore');
     }

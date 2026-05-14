@@ -22,6 +22,6 @@ export const getMessages = (otherUserId: string, params?: { skip?: number, limit
   return request({
     url: `/chat/messages/${otherUserId}`,
     method: 'GET',
-    data: params
+    params: params
   })
 }

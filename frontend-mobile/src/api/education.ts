@@ -45,7 +45,7 @@ export function getArticles(params: {
   return request({
     url: '/education/articles',
     method: 'GET',
-    data: params
+    params: params
   })
 }
 

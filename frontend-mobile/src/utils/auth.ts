@@ -1,5 +1,3 @@
-import { useUserStore } from '@/stores/user'
-
 const REDIRECT_URL_KEY = 'login_redirect_url'
 
 export function isLoggedIn(): boolean {

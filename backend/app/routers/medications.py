@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import uuid
 
 from .. import models, schemas, crud, dependencies
@@ -60,7 +60,7 @@ async def confirm_subscription(
     if existing:
         existing.is_subscribed = True
         existing.subscribe_count += 1
-        existing.updated_at = datetime.now()
+        existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(existing)
         return existing
@@ -325,7 +325,7 @@ def checkin_medication(
     
     taken_time_val = log_data.taken_time
     if log_data.status == "taken" and not taken_time_val:
-        taken_time_val = datetime.now()
+        taken_time_val = datetime.now(timezone.utc)
     
     if existing_log:
         existing_log.status = log_data.status
@@ -837,7 +837,7 @@ def create_makeup_record(
     
     if existing_log:
         existing_log.status = "taken"
-        existing_log.taken_time = datetime.now()
+        existing_log.taken_time = datetime.now(timezone.utc)
         existing_log.is_makeup = True
         existing_log.makeup_reason = makeup_data.makeup_reason
         existing_log.makeup_note = makeup_data.makeup_note
@@ -852,7 +852,7 @@ def create_makeup_record(
             patient_id=patient.id,
             member_id=current_member.id if current_member else None,
             scheduled_time=makeup_data.scheduled_time,
-            taken_time=datetime.now(),
+            taken_time=datetime.now(timezone.utc),
             status="taken",
             is_makeup=True,
             makeup_reason=makeup_data.makeup_reason,

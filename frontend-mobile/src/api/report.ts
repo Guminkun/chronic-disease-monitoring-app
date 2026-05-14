@@ -44,7 +44,7 @@ export const parseReport = (filePath: string, formData: any = {}) => {
                 'Authorization': token ? `Bearer ${token}` : ''
             },
             success: (uploadFileRes) => {
-                console.log('Upload result:', uploadFileRes)
+                if (import.meta.env.DEV) console.log('Upload result:', uploadFileRes)
                 if (uploadFileRes.statusCode === 200) {
                     try {
                         const data = JSON.parse(uploadFileRes.data)

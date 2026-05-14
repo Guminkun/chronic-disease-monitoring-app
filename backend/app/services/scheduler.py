@@ -3,7 +3,7 @@
 集成到FastAPI服务中，随服务启动自动运行
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from ..database import SessionLocal
 from ..models import MedicationPlan, MedicationLog, User, WechatSubscription, Reminder, Notification
@@ -27,7 +27,7 @@ class BackgroundScheduler:
         db = SessionLocal()
         
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             today = now.date()
             
             # 查询需要提醒的药品计划
@@ -148,7 +148,7 @@ class BackgroundScheduler:
                             
                             # 更新订阅次数
                             subscription.used_count += 1
-                            subscription.last_used_at = datetime.now()
+                            subscription.last_used_at = datetime.now(timezone.utc)
                             db.commit()
                             
                             logger.info(
@@ -180,7 +180,7 @@ class BackgroundScheduler:
         db = SessionLocal()
         
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             today = now.date()
             
             # 查询需要发送的监测提醒
@@ -220,8 +220,7 @@ class BackgroundScheduler:
                     elif freq == '每周一次':
                         is_due = today.weekday() == 0  # 周一
                     elif freq == '每周两次':
-                        days_diff = (today - reminder.created_at.date()).days
-                        is_due = days_diff % 3 == 0 or days_diff % 3 == 1
+                        is_due = today.weekday() in (0, 3)  # 周一、周四
                     else:
                         is_due = True
                     
@@ -285,7 +284,7 @@ class BackgroundScheduler:
                     if result.get("errcode") == 0:
                         # 更新订阅次数
                         subscription.used_count += 1
-                        subscription.last_used_at = datetime.now()
+                        subscription.last_used_at = datetime.now(timezone.utc)
                         db.commit()
                         
                         logger.info(

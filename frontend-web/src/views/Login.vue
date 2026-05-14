@@ -97,9 +97,16 @@
                   </el-input>
                 </el-form-item>
                 <el-form-item class="mt-6">
+                  <div class="flex items-center gap-2 mb-3">
+                    <el-checkbox v-model="agreeProtocol" />
+                    <span class="text-xs text-text-muted">
+                      已阅读并同意<a href="javascript:void(0)" class="text-primary-600 hover:underline">《服务协议》</a>和<a href="javascript:void(0)" class="text-primary-600 hover:underline">《隐私政策》</a>
+                    </span>
+                  </div>
                   <el-button 
                     type="primary" 
                     :loading="loading" 
+                    :disabled="!agreeProtocol"
                     class="w-full h-12 text-base font-medium rounded-xl"
                     @click="handleLogin"
                   >
@@ -148,6 +155,7 @@ const userStore = useUserStore()
 const activeTab = ref('password')
 const loading = ref(false)
 const formRef = ref()
+const agreeProtocol = ref(false)
 
 const form = reactive({
   username: '',

@@ -44,5 +44,6 @@ def decrypt_field(ciphertext: str | None) -> str | None:
         return ciphertext
     try:
         return f.decrypt(ciphertext.encode()).decode()
-    except Exception:
+    except Exception as e:
+        logger.error(f"Decryption failed: {e}")
         return ciphertext
