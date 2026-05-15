@@ -83,25 +83,33 @@ export const getCurrentMember = () => {
   return request({ url: '/members/current', method: 'GET' })
 }
 
-export const uploadAvatar = (filePath: string): Promise<{ url: string }> => {
+export const uploadAvatar = (filePath: string): Promise<any> => {
   return new Promise((resolve, reject) => {
     const baseURL = getBaseURL()
+    const url = baseURL + '/members/upload-avatar'
+    const token = uni.getStorageSync('token')
+    console.log('[uploadAvatar] url:', url)
+    console.log('[uploadAvatar] filePath:', filePath)
+    console.log('[uploadAvatar] token exists:', !!token)
     uni.uploadFile({
-      url: baseURL + '/members/upload-avatar',
-      filePath: filePath,
+      url,
+      filePath,
       name: 'file',
       header: {
-        'Authorization': `Bearer ${uni.getStorageSync('token')}`
+        'Authorization': `Bearer ${token}`
       },
       success: (res) => {
+        console.log('[uploadAvatar] statusCode:', res.statusCode)
+        console.log('[uploadAvatar] response:', res.data?.substring(0, 200))
         if (res.statusCode === 200) {
           const data = JSON.parse(res.data)
           resolve(data)
         } else {
-          reject(new Error('上传失败'))
+          reject(new Error(`上传失败 (${res.statusCode}): ${res.data?.substring(0, 100)}`))
         }
       },
       fail: (err) => {
+        console.error('[uploadAvatar] fail:', err)
         reject(err)
       }
     })

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # 后端地址（用于生成图片代理 URL）
+    BACKEND_URL: str = "http://127.0.0.1:8000"
+    
     # SMS Service
     SMS_SERVICE_URL: str = "http://mock-sms-service.com/send"
     

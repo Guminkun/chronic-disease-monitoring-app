@@ -15,6 +15,39 @@ router = APIRouter(
     tags=["members"],
 )
 
+
+def _fill_avatar_url(member):
+    """将 avatar_url 中的 file_key 转为后端代理 URL（同源，无跨域）"""
+    if not member.avatar_url:
+        return member
+    
+    url = member.avatar_url
+    
+    # 如果是完整的 HTTP URL，提取 file_key
+    if url.startswith("http"):
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            path = parsed.path.lstrip("/")
+            bucket_prefix = f"{settings.MINIO_BUCKET_AVATARS}/"
+            if path.startswith(bucket_prefix):
+                file_key = path[len(bucket_prefix):]
+            elif "/" in path:
+                file_key = path.split("/", 1)[1]
+            else:
+                return member
+            member.avatar_url = file_key
+        except Exception as e:
+            logger.warning(f"解析旧头像URL失败: {e}")
+            return member
+    
+    # file_key → 后端代理 URL（同源，避免 ORB 跨域问题）
+    if not member.avatar_url.startswith("http"):
+        bucket = settings.MINIO_BUCKET_AVATARS
+        member.avatar_url = f"{settings.BACKEND_URL}/files/image/{bucket}/{member.avatar_url}"
+    
+    return member
+
 @router.get("/", response_model=List[schemas.MemberResponse], summary="获取成员列表")
 def get_members(
     current_user: models.User = Depends(dependencies.get_current_active_user),
@@ -47,6 +80,9 @@ def get_members(
         db.commit()
         db.refresh(default_member)
         members = [default_member]
+    
+    for m in members:
+        _fill_avatar_url(m)
     
     return members
 
@@ -115,6 +151,7 @@ def get_member(
     if not member:
         raise HTTPException(status_code=404, detail="成员不存在")
     
+    _fill_avatar_url(member)
     return member
 
 @router.put("/{member_id}", response_model=schemas.MemberResponse, summary="更新成员信息")
@@ -149,6 +186,7 @@ def update_member(
     db.commit()
     db.refresh(member)
     
+    _fill_avatar_url(member)
     return member
 
 @router.delete("/{member_id}", summary="删除成员")
@@ -246,6 +284,7 @@ def get_current_member(
             members[0].is_current = True
             db.commit()
             db.refresh(members[0])
+            _fill_avatar_url(members[0])
             return members[0]
         else:
             default_nickname = patient.name if patient.name else "自己"
@@ -260,6 +299,7 @@ def get_current_member(
             db.refresh(default_member)
             return default_member
     
+    _fill_avatar_url(current_member)
     return current_member
 
 @router.post("/upload-avatar", response_model=dict, summary="上传成员头像")
@@ -307,12 +347,9 @@ async def upload_avatar(
             bucket_name=settings.MINIO_BUCKET_AVATARS
         )
         
-        endpoint = settings.MINIO_ENDPOINT
-        if not endpoint.startswith('http'):
-            endpoint = f"http://{endpoint}"
-        url = f"{endpoint}/avatars/{file_key}"
-        
-        return {"url": url, "filename": file_key}
+        # 返回 file_key 用于数据库存储，proxy_url 用于前端即时显示
+        proxy_url = f"{settings.BACKEND_URL}/files/image/{settings.MINIO_BUCKET_AVATARS}/{file_key}"
+        return {"url": file_key, "preview_url": proxy_url, "filename": file_key}
     except Exception as e:
         logger.error(f"头像上传失败: {e}")
         import traceback

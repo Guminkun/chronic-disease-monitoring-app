@@ -4,35 +4,19 @@
       <view class="form-container">
         <!-- 头像上传 -->
         <view class="avatar-section">
-          <!-- #ifdef MP-WEIXIN -->
-          <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar" :key="avatarKey">
+          <view class="avatar-btn" @click="onAvatarTap" :key="avatarKey">
             <image 
-              v-if="formData.avatar_url" 
-              :src="formData.avatar_url" 
+              v-if="avatarPreviewUrl || formData.avatar_url" 
+              :src="avatarPreviewUrl || formData.avatar_url" 
               class="avatar-image"
               mode="aspectFill"
-              :key="formData.avatar_url"
-            />
-            <view v-else class="avatar-placeholder">
-              <text class="plus-icon">+</text>
-              <text class="avatar-text">上传头像</text>
-            </view>
-          </button>
-          <!-- #endif -->
-          <!-- #ifndef MP-WEIXIN -->
-          <view class="avatar-btn" @click="chooseImage">
-            <image 
-              v-if="formData.avatar_url" 
-              :src="formData.avatar_url" 
-              class="avatar-image"
-              mode="aspectFill"
+              :key="avatarPreviewUrl || formData.avatar_url"
             />
             <view v-else class="avatar-placeholder">
               <text class="plus-icon">+</text>
               <text class="avatar-text">上传头像</text>
             </view>
           </view>
-          <!-- #endif -->
         </view>
         
         <view class="form-section">
@@ -249,8 +233,9 @@ import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useMemberStore } from '@/stores/member'
 import { useUserStore } from '@/stores/user'
-import { uploadAvatar } from '@/api/member'
+import { uploadAvatar, getMember } from '@/api/member'
 import type { MemberFormData } from '@/api/member'
+import { resolveImageUrl } from '@/utils/image'
 
 const memberStore = useMemberStore()
 const userStore = useUserStore()
@@ -259,6 +244,7 @@ const memberId = ref('')
 const isCustomRelation = ref(false)
 const avatarUploading = ref(false)
 const avatarKey = ref(0)
+const avatarPreviewUrl = ref('')
 const formData = ref<MemberFormData>({
   nickname: '',
   relation: '',
@@ -316,14 +302,21 @@ onLoad((options: any) => {
 })
 
 const loadMemberData = async () => {
-  const member = memberStore.members.find(m => m.id === memberId.value)
+  // 优先从后端获取最新数据（签名 URL 可能已过期）
+  let member: any = null
+  try {
+    member = await getMember(memberId.value)
+  } catch {
+    // 回退到本地 store
+    member = memberStore.members.find(m => m.id === memberId.value)
+  }
   if (member) {
     const isPresetRelation = relationOptions.includes(member.relation)
     isCustomRelation.value = !isPresetRelation
     formData.value = {
       nickname: member.nickname,
       relation: member.relation,
-      avatar_url: member.avatar_url || '',
+      avatar_url: '',
       age: member.age || '',
       gender: member.gender || '',
       height: member.height || '',
@@ -336,52 +329,78 @@ const loadMemberData = async () => {
       surgery_history: member.surgery_history || '',
       other_notes: member.other_notes || ''
     }
+    // avatar_url 来自后端（代理 URL），下载为本地路径以绕过 ORB
+    if (member.avatar_url) {
+      avatarPreviewUrl.value = await resolveImageUrl(member.avatar_url)
+    } else {
+      avatarPreviewUrl.value = ''
+    }
   }
 }
 
-const onChooseAvatar = async (e: any) => {
-  const avatarUrl = e.detail.avatarUrl
-  if (!avatarUrl) return
-  
+const onAvatarTap = () => {
+  // #ifdef MP-WEIXIN
+  uni.showActionSheet({
+    itemList: ['从相册选择', '拍照'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        chooseFromAlbum()
+      } else if (res.tapIndex === 1) {
+        chooseFromCamera()
+      }
+    }
+  })
+  // #endif
+  // #ifndef MP-WEIXIN
+  chooseFromAlbum()
+  // #endif
+}
+
+const chooseFromAlbum = () => {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album'],
+    success: (res) => {
+      doUpload(res.tempFilePaths[0])
+    }
+  })
+}
+
+const chooseFromCamera = () => {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['camera'],
+    success: (res) => {
+      doUpload(res.tempFilePaths[0])
+    }
+  })
+}
+
+const doUpload = async (filePath: string) => {
+  console.log('[doUpload] start, filePath:', filePath)
+  avatarPreviewUrl.value = filePath
   avatarUploading.value = true
   uni.showLoading({ title: '上传中...' })
   
   try {
-    const result = await uploadAvatar(avatarUrl)
+    const result = await uploadAvatar(filePath)
+    console.log('[doUpload] result:', JSON.stringify(result))
     formData.value.avatar_url = result.url
+    if (result.preview_url) {
+      avatarPreviewUrl.value = await resolveImageUrl(result.preview_url)
+    }
     avatarKey.value++
     uni.showToast({ title: '头像上传成功', icon: 'success' })
-  } catch (error) {
-    console.error('头像上传失败:', error)
-    uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+  } catch (error: any) {
+    console.error('[doUpload] error:', error?.message || error)
+    avatarPreviewUrl.value = ''
+    uni.showToast({ title: error?.message || '头像上传失败', icon: 'none' })
   } finally {
     avatarUploading.value = false
     uni.hideLoading()
   }
-}
-
-const chooseImage = () => {
-  uni.chooseImage({
-    count: 1,
-    sizeType: ['compressed'],
-    sourceType: ['album', 'camera'],
-    success: async (res) => {
-      const tempFilePath = res.tempFilePaths[0]
-      avatarUploading.value = true
-      uni.showLoading({ title: '上传中...' })
-      try {
-        const result = await uploadAvatar(tempFilePath)
-        formData.value.avatar_url = result.url
-        uni.showToast({ title: '头像上传成功', icon: 'success' })
-      } catch (error) {
-        console.error('头像上传失败:', error)
-        uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
-      } finally {
-        avatarUploading.value = false
-        uni.hideLoading()
-      }
-    }
-  })
 }
 
 const onNicknameChange = (e: any) => {
@@ -450,6 +469,7 @@ const handleSave = async () => {
     relation: formData.value.relation.trim()
   }
   
+  // 只在新上传头像时才发送 avatar_url（file_key）
   if (formData.value.avatar_url) {
     submitData.avatar_url = formData.value.avatar_url
   }
@@ -516,21 +536,15 @@ const handleSave = async () => {
 
 .avatar-section {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 20px;
   
   .avatar-btn {
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: none;
-    border: none;
-    padding: 0;
     overflow: hidden;
-    
-    &::after {
-      border: none;
-    }
   }
   
   .avatar-image {

@@ -9,35 +9,19 @@
           </view>
           
           <view class="avatar-section">
-            <!-- #ifdef MP-WEIXIN -->
-            <button class="avatar-btn-wrapper" open-type="chooseAvatar" @chooseavatar="onChooseAvatar" :key="avatarKey">
+            <view class="avatar-upload" @click="onAvatarTap" :key="avatarKey">
               <image 
-                v-if="formData.avatar_url" 
-                :src="formData.avatar_url + '?t=' + Date.now()" 
+                v-if="avatarPreviewUrl || formData.avatar_url" 
+                :src="avatarPreviewUrl || formData.avatar_url" 
                 class="avatar-preview" 
                 mode="aspectFill"
-                :key="formData.avatar_url"
-              />
-              <view v-else class="avatar-placeholder-add">
-                <text class="avatar-add-icon">+</text>
-                <text class="avatar-add-text">添加头像</text>
-              </view>
-            </button>
-            <!-- #endif -->
-            <!-- #ifndef MP-WEIXIN -->
-            <view class="avatar-upload" @click="chooseAvatar">
-              <image 
-                v-if="formData.avatar_url" 
-                :src="formData.avatar_url" 
-                class="avatar-preview" 
-                mode="aspectFill"
+                :key="avatarPreviewUrl || formData.avatar_url"
               />
               <view v-else class="avatar-placeholder-add">
                 <text class="avatar-add-icon">+</text>
                 <text class="avatar-add-text">添加头像</text>
               </view>
             </view>
-            <!-- #endif -->
           </view>
           
           <view class="form-item">
@@ -260,6 +244,7 @@ const showExtended = ref(false)
 const isCustomRelation = ref(false)
 const avatarUploading = ref(false)
 const avatarKey = ref(0)
+const avatarPreviewUrl = ref('')
 
 const formData = ref<MemberFormData>({
   nickname: '',
@@ -315,48 +300,56 @@ const resetRelation = () => {
   formData.value.relation = ''
 }
 
-const chooseAvatar = () => {
+const onAvatarTap = () => {
+  // #ifdef MP-WEIXIN
+  uni.showActionSheet({
+    itemList: ['从相册选择', '拍照'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        chooseFromAlbum()
+      } else if (res.tapIndex === 1) {
+        chooseFromCamera()
+      }
+    }
+  })
+  // #endif
+  // #ifndef MP-WEIXIN
+  chooseFromAlbum()
+  // #endif
+}
+
+const chooseFromAlbum = () => {
   uni.chooseImage({
     count: 1,
     sizeType: ['compressed'],
-    sourceType: ['album', 'camera'],
-    success: async (res) => {
-      const tempFilePath = res.tempFilePaths[0]
-      avatarUploading.value = true
-      uni.showLoading({ title: '上传中...' })
-      try {
-        const result = await uploadAvatar(tempFilePath)
-        formData.value.avatar_url = result.url
-        uni.showToast({ title: '头像上传成功', icon: 'success' })
-      } catch (error) {
-        console.error('头像上传失败:', error)
-        uni.showToast({ title: '头像上传失败', icon: 'none' })
-      } finally {
-        avatarUploading.value = false
-        uni.hideLoading()
-      }
-    },
-    fail: () => {
-      uni.showToast({ title: '取消选择', icon: 'none' })
-    }
+    sourceType: ['album'],
+    success: (res) => doUpload(res.tempFilePaths[0])
   })
 }
 
-const onChooseAvatar = async (e: any) => {
-  const avatarUrl = e.detail.avatarUrl
-  if (!avatarUrl) return
-  
+const chooseFromCamera = () => {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['camera'],
+    success: (res) => doUpload(res.tempFilePaths[0])
+  })
+}
+
+const doUpload = async (filePath: string) => {
+  avatarPreviewUrl.value = filePath
   avatarUploading.value = true
   uni.showLoading({ title: '上传中...' })
-  
   try {
-    const result = await uploadAvatar(avatarUrl)
+    const result = await uploadAvatar(filePath)
     formData.value.avatar_url = result.url
+    avatarPreviewUrl.value = result.preview_url || result.url
     avatarKey.value++
     uni.showToast({ title: '头像上传成功', icon: 'success' })
   } catch (error) {
     console.error('头像上传失败:', error)
-    uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+    avatarPreviewUrl.value = ''
+    uni.showToast({ title: '头像上传失败', icon: 'none' })
   } finally {
     avatarUploading.value = false
     uni.hideLoading()
@@ -514,26 +507,9 @@ const handleSave = async () => {
 
 .avatar-section {
   display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.avatar-btn-wrapper {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border: 2px dashed #7dd3fc;
-  display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 0;
-  
-  &::after {
-    border: none;
-  }
+  margin-bottom: 20px;
 }
 
 .avatar-upload {

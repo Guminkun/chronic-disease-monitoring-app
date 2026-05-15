@@ -10,6 +10,7 @@ import {
   setCurrentMember,
   getCurrentMember
 } from '@/api/member'
+import { resolveImageUrl } from '@/utils/image'
 
 export const useMemberStore = defineStore('member', () => {
   const members = ref<Member[]>([])
@@ -20,7 +21,14 @@ export const useMemberStore = defineStore('member', () => {
     loading.value = true
     try {
       const data: any = await getMembers()
-      members.value = Array.isArray(data) ? data : []
+      const list: Member[] = Array.isArray(data) ? data : []
+      // 将头像网络 URL 下载为本地临时路径（绕过小程序 ORB）
+      for (const m of list) {
+        if (m.avatar_url && m.avatar_url.startsWith('http')) {
+          m.avatar_url = await resolveImageUrl(m.avatar_url)
+        }
+      }
+      members.value = list
       const current = members.value.find(m => m.is_current)
       currentMember.value = current || (members.value.length > 0 ? members.value[0] : null)
     } catch (e) {
@@ -125,6 +133,9 @@ export const useMemberStore = defineStore('member', () => {
   const loadCurrentMember = async () => {
     try {
       const data: any = await getCurrentMember()
+      if (data?.avatar_url && data.avatar_url.startsWith('http')) {
+        data.avatar_url = await resolveImageUrl(data.avatar_url)
+      }
       currentMember.value = data
     } catch (e) {
       console.error('Failed to load current member:', e)

@@ -57,12 +57,8 @@ async def upload_avatar(
             bucket_name=settings.MINIO_BUCKET_AVATARS
         )
         
-        endpoint = settings.MINIO_ENDPOINT
-        if not endpoint.startswith('http'):
-            endpoint = f"http://{endpoint}"
-        url = f"{endpoint}/avatars/{file_key}"
-        
-        return {"url": url, "filename": file_key}
+        proxy_url = f"{settings.BACKEND_URL}/files/image/{settings.MINIO_BUCKET_AVATARS}/{file_key}"
+        return {"url": file_key, "preview_url": proxy_url, "filename": file_key}
     except Exception as e:
         logger.error(f"头像上传失败: {e}")
         import traceback

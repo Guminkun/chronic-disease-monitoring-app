@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.minio_service import minio_service
@@ -14,6 +15,25 @@ router = APIRouter(
     prefix="/files",
     tags=["files"]
 )
+
+
+@router.get("/image/{bucket}/{key:path}", summary="代理图片（解决跨域）")
+def serve_image(bucket: str, key: str):
+    """从 RustFS 获取图片并返回，避免小程序跨域 ORB 问题"""
+    try:
+        response = minio_service.client.get_object(bucket, key)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        return Response(content=data, media_type="image/jpeg", headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Headers": "*",
+        })
+    except Exception as e:
+        logger.warning(f"代理图片失败: {bucket}/{key} - {e}")
+        raise HTTPException(status_code=404, detail="图片不存在")
 
 
 @router.get("/presigned-url")
